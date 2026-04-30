@@ -51,6 +51,80 @@ final class SideCarViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.groupedThreads.first?.threads.map(\.id), ["waiting"])
     }
 
+    func testThreadPresentationBuildsApprovalProgressAndTimelineBuckets() {
+        let approval = TimelineItem(
+            id: "approval-item",
+            kind: .approval,
+            title: "Approve shell command",
+            summary: "Needs explicit review",
+            source: .appServerLive
+        )
+        let tool = TimelineItem(
+            id: "tool-item",
+            kind: .commandExecution,
+            title: "Run tests",
+            summary: "swift test",
+            source: .appServerLive
+        )
+        let change = TimelineItem(
+            id: "change-item",
+            kind: .fileChange,
+            title: "Update view",
+            summary: "Refactor layout",
+            source: .appServerLive
+        )
+        let thread = ThreadSnapshot(
+            id: "approval-thread",
+            title: "Approval thread",
+            status: .waitingForApproval,
+            freshness: Freshness(source: .appServerLive, note: "Waiting on user decision"),
+            currentTurn: TurnSnapshot(
+                id: "turn-approval",
+                phase: .waitingForApproval,
+                itemGroups: [tool, change, approval],
+                blockers: [approval]
+            ),
+            summary: "Waiting"
+        )
+        let diagnostics = SourceDiagnostics(
+            activeThread: thread,
+            probe: CapabilityProbe(appServerAvailable: true, transport: "app-server")
+        )
+
+        let presentation = SideCarThreadPresentation(thread: thread, diagnostics: diagnostics)
+
+        XCTAssertEqual(presentation.liveContext.title, "Awaiting approval")
+        XCTAssertEqual(presentation.liveContext.progressLabel, "1 approvals waiting")
+        XCTAssertEqual(presentation.liveContext.note, "Waiting on user decision")
+        XCTAssertEqual(presentation.timelineSummary.totalCount, 3)
+        XCTAssertEqual(presentation.timelineSummary.buckets, [
+            .init(kind: .tools, count: 1),
+            .init(kind: .changes, count: 1),
+            .init(kind: .approvals, count: 1)
+        ])
+        XCTAssertEqual(presentation.timelineSummary.latestTitle, "Approve shell command")
+    }
+
+    func testThreadPresentationMarksStaleThreadAsNeedsRefresh() {
+        let thread = ThreadSnapshot(
+            id: "stale",
+            title: "Stale thread",
+            status: .running,
+            freshness: Freshness(source: .fixture, isStale: true),
+            summary: "Old state"
+        )
+        let diagnostics = SourceDiagnostics(
+            activeThread: thread,
+            probe: CapabilityProbe(appServerAvailable: false, transport: "fixture")
+        )
+
+        let presentation = SideCarThreadPresentation(thread: thread, diagnostics: diagnostics)
+
+        XCTAssertEqual(presentation.liveContext.title, "Needs refresh")
+        XCTAssertEqual(presentation.liveContext.progressValue, 0.2)
+        XCTAssertEqual(presentation.timelineSummary.totalCount, 0)
+    }
+
     func testConfirmStagedActionUsesLiveExecutor() async {
         let executedAction = ActionRecorder()
         let viewModel = SideCarViewModel(
