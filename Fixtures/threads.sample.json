@@ -1,0 +1,28 @@
+[
+  {
+    "id" : "fixture-thread-001",
+    "title" : "Prototype Codex sidebar agent",
+    "cwd" : "~/Documents/Codex/SideCar",
+    "status" : "running",
+    "model" : "gpt-5.5",
+    "freshness" : {
+      "capturedAt" : "2026-04-30T00:00:00Z",
+      "source" : "fixture",
+      "isStale" : false,
+      "note" : "Sanitized fixture"
+    },
+    "currentTurn" : {
+      "id" : "fixture-turn-001",
+      "phase" : "running",
+      "startedAt" : "2026-04-30T00:00:00Z",
+      "completedAt" : null,
+      "itemGroups" : [],
+      "blockers" : []
+    },
+    "summary" : "Sanitized long-running SideCar implementation fixture.",
+    "recommendations" : [
+      "Attach app-server live stream.",
+      "Keep unsafe actions excluded."
+    ]
+  }
+]
