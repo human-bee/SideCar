@@ -6,6 +6,7 @@ public protocol JSONRPCLineReadable: AnyObject {
 
 public enum CodexServerNotificationStreamEvent: Equatable, Sendable {
     case notification(CodexServerNotification)
+    case request(CodexServerRequest)
     case malformed(CodexServerNotificationStreamError)
 }
 
@@ -46,7 +47,26 @@ public struct CodexServerNotificationPump: Sendable {
             }
 
             if object["id"] != nil {
-                return nil
+                guard case .string(let method)? = object["method"] else {
+                    return nil
+                }
+
+                guard CodexServerRequestMethod(rawValue: method) != nil else {
+                    return nil
+                }
+
+                do {
+                    let request = try JSONRPCCodec.decodeServerRequest(line)
+                    let event = try CodexServerRequest.decode(request)
+                    return .request(event)
+                } catch {
+                    return .malformed(.init(
+                        kind: .malformedNotification,
+                        method: method,
+                        line: lineString,
+                        details: String(describing: error)
+                    ))
+                }
             }
 
             guard case .string(let method)? = object["method"] else {

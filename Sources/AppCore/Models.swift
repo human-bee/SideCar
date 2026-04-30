@@ -67,6 +67,7 @@ public struct TimelineItem: Identifiable, Codable, Equatable, Sendable {
     public var title: String
     public var summary: String
     public var detail: String?
+    public var serverRequestID: String?
     public var createdAt: Date
     public var source: SnapshotSource
     public var rawPayloadPath: String?
@@ -77,6 +78,7 @@ public struct TimelineItem: Identifiable, Codable, Equatable, Sendable {
         title: String,
         summary: String,
         detail: String? = nil,
+        serverRequestID: String? = nil,
         createdAt: Date = Date(),
         source: SnapshotSource,
         rawPayloadPath: String? = nil
@@ -86,6 +88,7 @@ public struct TimelineItem: Identifiable, Codable, Equatable, Sendable {
         self.title = title
         self.summary = summary
         self.detail = detail
+        self.serverRequestID = serverRequestID
         self.createdAt = createdAt
         self.source = source
         self.rawPayloadPath = rawPayloadPath

@@ -24,6 +24,118 @@ import Testing
     #expect(json?.contains("list") == true)
 }
 
+@Test func serverRequestDecodesCommandApprovalAndPreservesRequestID() throws {
+    let request = try decodeServerRequest("""
+    {
+      "jsonrpc": "2.0",
+      "id": 41,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "itemId": "cmd-1",
+        "threadId": "thread-1",
+        "turnId": "turn-1",
+        "reason": "Needs approval",
+        "command": "swift test",
+        "cwd": "/tmp/sidecar",
+        "availableDecisions": ["accept", "decline", "cancel"]
+      }
+    }
+    """)
+
+    let event = try CodexServerRequest.decode(request)
+
+    guard case .commandApproval(_, let payload) = event else {
+        Issue.record("Expected command approval request")
+        return
+    }
+
+    #expect(event.id == .number(41))
+    #expect(payload.itemId == "cmd-1")
+    #expect(payload.command == "swift test")
+    #expect(payload.cwd == "/tmp/sidecar")
+    #expect(payload.availableDecisions == [
+        CodexCommandApprovalDecision.accept,
+        CodexCommandApprovalDecision.decline,
+        CodexCommandApprovalDecision.cancel
+    ])
+
+    let item = CodexServerRequestMapper.timelineItem(from: event)
+    #expect(item.id == "cmd-1")
+    #expect(item.kind == .approval)
+    #expect(item.summary == "Needs approval")
+    #expect(item.detail == "swift test")
+    #expect(item.serverRequestID == "41")
+}
+
+@Test func serverRequestDecodesFileApprovalAndPreservesRequestID() throws {
+    let request = try decodeServerRequest("""
+    {
+      "jsonrpc": "2.0",
+      "id": "req-file-1",
+      "method": "item/fileChange/requestApproval",
+      "params": {
+        "itemId": "file-1",
+        "threadId": "thread-1",
+        "turnId": "turn-1",
+        "reason": "Needs write approval",
+        "grantRoot": "/tmp/sidecar"
+      }
+    }
+    """)
+
+    let event = try CodexServerRequest.decode(request)
+
+    guard case .fileApproval(_, let payload) = event else {
+        Issue.record("Expected file approval request")
+        return
+    }
+
+    #expect(event.id == .string("req-file-1"))
+    #expect(payload.itemId == "file-1")
+    #expect(payload.grantRoot == "/tmp/sidecar")
+
+    let item = CodexServerRequestMapper.timelineItem(from: event)
+    #expect(item.id == "file-1")
+    #expect(item.kind == .approval)
+    #expect(item.summary == "Needs write approval")
+    #expect(item.detail == "Grant write access to /tmp/sidecar")
+    #expect(item.serverRequestID == "req-file-1")
+}
+
+@Test func serverApprovalResponseEncodesAcceptAndDeclineWithSameRequestID() throws {
+    let accept = CodexApprovalResponse.command(
+        requestID: .number(41),
+        decision: .acceptForSession
+    )
+    let decline = CodexApprovalResponse.fileChange(
+        requestID: .string("req-file-1"),
+        decision: .decline
+    )
+
+    let acceptJSON = try decodeJSONObject(try JSONRPCCodec.encodeLine(accept))
+    let declineJSON = try decodeJSONObject(try JSONRPCCodec.encodeLine(decline))
+
+    #expect(acceptJSON["id"] as? Double == 41)
+    #expect((acceptJSON["result"] as? [String: Any])?["decision"] as? String == "acceptForSession")
+    #expect(declineJSON["id"] as? String == "req-file-1")
+    #expect((declineJSON["result"] as? [String: Any])?["decision"] as? String == "decline")
+}
+
+@Test func serverApprovalResponseEncodesJSONRPCErrorWithSameRequestID() throws {
+    let response = JSONRPCResponse.rpcError(
+        id: .number(52),
+        code: -32001,
+        message: "Approval request expired"
+    )
+
+    let json = try decodeJSONObject(try JSONRPCCodec.encodeLine(response))
+
+    #expect(json["id"] as? Double == 52)
+    let error = json["error"] as? [String: Any]
+    #expect(error?["code"] as? Double == -32001)
+    #expect(error?["message"] as? String == "Approval request expired")
+}
+
 @Test func serverNotificationDecodesThreadStatusChanged() throws {
     let notification = try decodeNotification("""
     {
@@ -246,7 +358,7 @@ import Testing
     #expect(params == .object(["state": .string("warming")]))
 }
 
-@Test func notificationPumpIgnoresResponsesAndRequests() throws {
+@Test func notificationPumpEmitsApprovalServerRequestsButIgnoresOrdinaryClientCalls() throws {
     let pump = CodexServerNotificationPump()
 
     let response = pump.consume(line: jsonLineData("""
@@ -262,6 +374,20 @@ import Testing
     {
       "jsonrpc": "2.0",
       "id": 5,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "itemId": "cmd-2",
+        "threadId": "thread-1",
+        "turnId": "turn-1",
+        "command": "pwd",
+        "reason": "Approve command"
+      }
+    }
+    """))
+    let ordinaryCall = pump.consume(line: jsonLineData("""
+    {
+      "jsonrpc": "2.0",
+      "id": 6,
       "method": "thread/list",
       "params": {
         "limit": 10
@@ -270,7 +396,18 @@ import Testing
     """))
 
     #expect(response == nil)
-    #expect(request == nil)
+    guard case .request(let approvalRequest) = request else {
+        Issue.record("Expected approval server request")
+        return
+    }
+    #expect(approvalRequest.id == .number(5))
+    guard case .commandApproval(_, let payload) = approvalRequest else {
+        Issue.record("Expected command approval payload")
+        return
+    }
+    #expect(payload.itemId == "cmd-2")
+    #expect(payload.command == "pwd")
+    #expect(ordinaryCall == nil)
 }
 
 @Test func notificationPumpSurfacesMalformedPayloadDeterministically() throws {
@@ -571,6 +708,16 @@ private final class MockCodexTransport: CodexAppServerTransport {
 private func decodeNotification(_ json: String) throws -> JSONRPCNotification {
     let data = Data(json.utf8)
     return try JSONRPCCodec.decodeNotification(data)
+}
+
+private func decodeServerRequest(_ json: String) throws -> JSONRPCServerRequest {
+    let data = Data(json.utf8)
+    return try JSONRPCCodec.decodeServerRequest(data)
+}
+
+private func decodeJSONObject(_ data: Data) throws -> [String: Any] {
+    let trimmedData = data.last == 0x0A ? data.dropLast() : data[...]
+    return try #require(JSONSerialization.jsonObject(with: Data(trimmedData)) as? [String: Any])
 }
 
 private func jsonLineData(_ json: String) -> Data {
