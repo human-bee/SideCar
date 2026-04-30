@@ -338,11 +338,14 @@ public struct CodexAppServerClient {
         }
     }
 
-    public func loadBestAvailableSnapshots(limit: Int = 12) -> [ThreadSnapshot] {
+    public func loadBestAvailableSnapshots(limit: Int = 12, includeActiveTurns: Bool = true) -> [ThreadSnapshot] {
         do {
             let recent = try loadRecentThreadSnapshots(limit: limit)
             guard let first = recent.first else {
                 return []
+            }
+            guard includeActiveTurns else {
+                return recent
             }
             let active = (try? readThreadSnapshot(threadId: first.id, includeTurns: true)) ?? first
             return [active] + Array(recent.dropFirst())

@@ -52,13 +52,13 @@ final class SideCarViewModelTests: XCTestCase {
     }
 
     func testConfirmStagedActionUsesLiveExecutor() async {
-        var executedAction: SideCarAction?
+        let executedAction = ActionRecorder()
         let viewModel = SideCarViewModel(
             repository: StubThreadRepository(threads: Self.threadFixtures),
             openAIKeyAvailable: { false }
         )
         viewModel.liveActionExecutor = { action in
-            executedAction = action
+            await executedAction.record(action)
             return "ok"
         }
 
@@ -67,12 +67,34 @@ final class SideCarViewModelTests: XCTestCase {
         viewModel.confirmStagedAction()
 
         try? await Task.sleep(nanoseconds: 50_000_000)
-        XCTAssertEqual(executedAction?.kind, .queueMessage)
+        let recordedAction = await executedAction.currentAction()
+        XCTAssertEqual(recordedAction?.kind, .queueMessage)
         XCTAssertEqual(viewModel.stagedAction?.confirmationState, .executed)
         XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Sent to live Codex app-server.") == true)
     }
 
-    private static let threadFixtures: [ThreadSnapshot] = [
+    func testReloadTimeoutKeepsFixtureDataWhenLiveSourceHangs() async {
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            openAIKeyAvailable: { false }
+        )
+        viewModel.liveReloadTimeoutNanoseconds = 10_000_000
+        viewModel.liveReload = {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            return (Self.threadFixtures, CapabilityProbe(appServerAvailable: true, transport: "app-server"))
+        }
+
+        viewModel.reloadFromBestAvailableSource()
+
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertFalse(viewModel.isReloading)
+        XCTAssertEqual(viewModel.activeThread.id, SampleData.activeThread.id)
+        XCTAssertEqual(viewModel.capabilityProbe.transport, "fixture")
+        XCTAssertEqual(viewModel.capabilityProbe.appServerAvailable, false)
+        XCTAssertTrue(viewModel.capabilityProbe.notes.contains("Live app-server reload timed out; staying in fixture mode."))
+    }
+
+    nonisolated private static let threadFixtures: [ThreadSnapshot] = [
         ThreadSnapshot(
             id: "live",
             title: "Live thread",
@@ -102,6 +124,18 @@ final class SideCarViewModelTests: XCTestCase {
             summary: "Old"
         )
     ]
+}
+
+private actor ActionRecorder {
+    private(set) var action: SideCarAction?
+
+    func record(_ action: SideCarAction) {
+        self.action = action
+    }
+
+    func currentAction() -> SideCarAction? {
+        action
+    }
 }
 
 private final class StubThreadRepository: ThreadRepository {

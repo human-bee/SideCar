@@ -3,6 +3,8 @@ import Combine
 import ThreadStore
 import VoiceCore
 
+private typealias ReloadResult = ([ThreadSnapshot], CapabilityProbe)
+
 @MainActor
 public final class SideCarViewModel: ObservableObject {
     @Published public private(set) var activeThread: ThreadSnapshot
@@ -19,8 +21,9 @@ public final class SideCarViewModel: ObservableObject {
     @Published public private(set) var openAIKeyStatus: SettingsStatus
     @Published public private(set) var selectedThreadId: ThreadSnapshot.ID?
 
-    public var liveReload: (() async -> ([ThreadSnapshot], CapabilityProbe))?
-    public var liveActionExecutor: ((SideCarAction) async throws -> String?)?
+    public var liveReload: (@Sendable () async -> ([ThreadSnapshot], CapabilityProbe))?
+    public var liveActionExecutor: (@Sendable (SideCarAction) async throws -> String?)?
+    public var liveReloadTimeoutNanoseconds: UInt64 = 1_500_000_000
 
     private let repository: ThreadRepository
     private let actionGate = ActionGate()
@@ -85,11 +88,35 @@ public final class SideCarViewModel: ObservableObject {
         }
         isReloading = true
         Task {
-            let (snapshots, probe) = await liveReload()
+            let (snapshots, probe) = await boundedLiveReload(liveReload)
             applySnapshots(snapshots)
             updateCapabilityProbe(probe)
             isReloading = false
         }
+    }
+
+    private func boundedLiveReload(_ reload: @escaping @Sendable () async -> ReloadResult) async -> ReloadResult {
+        let race = LiveReloadRace()
+        let timeout = liveReloadTimeoutNanoseconds
+        Task.detached(priority: .utility) {
+            await race.finish(reload())
+        }
+        Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: timeout)
+            await race.finish(Self.fixtureReloadResult(note: "Live app-server reload timed out; staying in fixture mode."))
+        }
+        return await race.value()
+    }
+
+    nonisolated private static func fixtureReloadResult(note: String) -> ReloadResult {
+        (
+            [SampleData.activeThread] + SampleData.backgroundThreads,
+            CapabilityProbe(
+                appServerAvailable: false,
+                transport: "fixture",
+                notes: [note]
+            )
+        )
     }
 
     public func stageMessage(asSteer: Bool = false) {
@@ -241,6 +268,27 @@ public final class SideCarViewModel: ObservableObject {
             return "Compact this thread context."
         case .approvalDecision:
             return "Respond to the pending approval."
+        }
+    }
+}
+
+private actor LiveReloadRace {
+    private var result: ReloadResult?
+    private var waiters: [CheckedContinuation<ReloadResult, Never>] = []
+
+    func finish(_ result: ReloadResult) {
+        guard self.result == nil else { return }
+        self.result = result
+        waiters.forEach { $0.resume(returning: result) }
+        waiters.removeAll()
+    }
+
+    func value() async -> ReloadResult {
+        if let result {
+            return result
+        }
+        return await withCheckedContinuation { continuation in
+            waiters.append(continuation)
         }
     }
 }
