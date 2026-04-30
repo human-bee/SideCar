@@ -1,8 +1,10 @@
 import Foundation
 
-public protocol JSONRPCLineReadable: AnyObject {
+public protocol CodexLineReadable: AnyObject {
     func readLine() throws -> Data?
 }
+
+public typealias JSONRPCLineReadable = CodexLineReadable
 
 public enum CodexServerNotificationStreamEvent: Equatable, Sendable {
     case notification(CodexServerNotification)
@@ -72,6 +74,38 @@ public struct CodexServerNotificationPump: Sendable {
                 line: lineString,
                 details: String(describing: error)
             ))
+        }
+    }
+}
+
+public final class CodexServerNotificationStream: @unchecked Sendable {
+    private let pump: CodexServerNotificationPump
+    private var stopped = false
+
+    public init(pump: CodexServerNotificationPump = CodexServerNotificationPump()) {
+        self.pump = pump
+    }
+
+    public func stop() {
+        stopped = true
+    }
+
+    public func consume(
+        from reader: CodexLineReadable,
+        onEvent: (CodexServerNotificationStreamEvent) throws -> Void
+    ) throws {
+        stopped = false
+
+        while !stopped {
+            guard let line = try reader.readLine() else {
+                return
+            }
+
+            guard let event = pump.consume(line: line) else {
+                continue
+            }
+
+            try onEvent(event)
         }
     }
 }
