@@ -36,14 +36,18 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
 
     private func configureLiveReload() {
         viewModel.liveReload = {
-            let client = CodexAppServerClient()
-            let snapshots = client.loadBestAvailableSnapshots()
-            let probe = client.probe()
-            return (snapshots, probe)
+            await Task.detached(priority: .utility) {
+                let client = CodexAppServerClient()
+                let snapshots = client.loadBestAvailableSnapshots(includeActiveTurns: false)
+                let probe = client.probe()
+                return (snapshots, probe)
+            }.value
         }
         viewModel.liveActionExecutor = { action in
-            let result = try CodexAppServerClient().executeLiveAction(action)
-            return result.map { String(describing: $0) }
+            try await Task.detached(priority: .userInitiated) {
+                let result = try CodexAppServerClient().executeLiveAction(action)
+                return result.map { String(describing: $0) }
+            }.value
         }
     }
 
