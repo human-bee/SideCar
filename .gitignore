@@ -8,6 +8,7 @@ DerivedData/
 .env
 .env.*
 !.env.example
+.codex/
 SideCar.app/
 dist/
 *.dSYM/
