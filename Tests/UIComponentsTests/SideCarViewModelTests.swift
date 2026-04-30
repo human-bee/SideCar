@@ -1,10 +1,86 @@
 import AppCore
 import ThreadStore
 import UIComponents
+import VoiceCore
 import XCTest
 
 @MainActor
 final class SideCarViewModelTests: XCTestCase {
+    func testCheckRealtimeUsesInjectedStatusClientAndPublishesReadyDiagnostic() async {
+        let client = StubRealtimeStatusClient(
+            currentStatus: .ready(model: "gpt-realtime-1.5"),
+            checkedStatus: .active(model: "gpt-realtime-1.5", createdAt: Date(timeIntervalSince1970: 1_234))
+        )
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            realtimeStatusClient: client,
+            openAIKeyAvailable: { true }
+        )
+
+        XCTAssertEqual(viewModel.realtimeReadiness.state, .ready)
+
+        await viewModel.checkRealtimeReadiness()
+
+        XCTAssertEqual(client.checkCallCount, 1)
+        XCTAssertEqual(viewModel.realtimeReadiness.state, .active)
+        XCTAssertEqual(viewModel.realtimeReadiness.diagnostic, "Realtime gpt-realtime-1.5 active")
+    }
+
+    func testCapturePreviewCreatesUnsentMetadataOnlyBundle() throws {
+        let previewURL = URL(fileURLWithPath: "/tmp/sidecar-preview.png")
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            screenPreviewCoordinator: StubScreenPreviewCoordinator(
+                permission: .granted,
+                capturedBundle: VisualContextBundle(
+                    displayName: "Main display",
+                    imagePath: previewURL.path,
+                    previewAccepted: false,
+                    sentToModel: false
+                )
+            ),
+            openAIKeyAvailable: { false }
+        )
+
+        try viewModel.capturePreview()
+
+        XCTAssertEqual(viewModel.previewBundle?.displayName, "Main display")
+        XCTAssertEqual(viewModel.previewBundle?.imagePath, previewURL.path)
+        XCTAssertEqual(viewModel.previewBundle?.previewAccepted, false)
+        XCTAssertEqual(viewModel.previewBundle?.sentToModel, false)
+    }
+
+    func testAcceptPreviewMarksAcceptedWithoutMarkingSentToModel() throws {
+        let previewURL = URL(fileURLWithPath: "/tmp/sidecar-preview.png")
+        let acceptedBundle = VisualContextBundle(
+            displayName: "Main display",
+            imagePath: previewURL.path,
+            previewAccepted: true,
+            sentToModel: false
+        )
+        let coordinator = StubScreenPreviewCoordinator(
+            permission: .granted,
+            capturedBundle: VisualContextBundle(
+                displayName: "Main display",
+                imagePath: previewURL.path,
+                previewAccepted: false,
+                sentToModel: false
+            ),
+            acceptedBundle: acceptedBundle
+        )
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            screenPreviewCoordinator: coordinator,
+            openAIKeyAvailable: { false }
+        )
+        try viewModel.capturePreview()
+
+        viewModel.acceptPreview()
+
+        XCTAssertEqual(viewModel.previewBundle, acceptedBundle)
+        XCTAssertEqual(coordinator.acceptCallCount, 1)
+    }
+
     func testSaveOpenAIKeyUsesInjectedBrokerAndClearsDraft() {
         var savedKey: String?
         let viewModel = SideCarViewModel(
@@ -378,6 +454,60 @@ private actor ActionRecorder {
 
     func currentAction() -> SideCarAction? {
         action
+    }
+}
+
+private final class StubRealtimeStatusClient: RealtimeStatusClient, @unchecked Sendable {
+    let currentStatus: RealtimeSessionStatus
+    let checkedStatus: RealtimeSessionStatus
+    private(set) var checkCallCount = 0
+
+    init(currentStatus: RealtimeSessionStatus, checkedStatus: RealtimeSessionStatus) {
+        self.currentStatus = currentStatus
+        self.checkedStatus = checkedStatus
+    }
+
+    func currentRealtimeStatus(model: String) -> RealtimeSessionStatus {
+        currentStatus
+    }
+
+    func checkRealtimeStatus(model: String) async -> RealtimeSessionStatus {
+        checkCallCount += 1
+        return checkedStatus
+    }
+}
+
+private final class StubScreenPreviewCoordinator: ScreenPreviewCoordinating {
+    let permission: ScreenCapturePermissionState
+    let capturedBundle: VisualContextBundle
+    let acceptedBundle: VisualContextBundle
+    private(set) var acceptCallCount = 0
+
+    init(
+        permission: ScreenCapturePermissionState,
+        capturedBundle: VisualContextBundle,
+        acceptedBundle: VisualContextBundle? = nil
+    ) {
+        self.permission = permission
+        self.capturedBundle = capturedBundle
+        self.acceptedBundle = acceptedBundle ?? capturedBundle
+    }
+
+    func permissionState() -> ScreenCapturePermissionState {
+        permission
+    }
+
+    func requestPermission() -> Bool {
+        true
+    }
+
+    func capturePreviewBundle(displayName: String) throws -> VisualContextBundle {
+        capturedBundle
+    }
+
+    func markPreviewAccepted(_ bundle: VisualContextBundle) -> VisualContextBundle {
+        acceptCallCount += 1
+        return acceptedBundle
     }
 }
 

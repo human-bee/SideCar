@@ -29,6 +29,13 @@ public protocol ScreenImageCapturing: Sendable {
     func captureMainDisplayPreview() throws -> URL
 }
 
+public protocol ScreenPreviewCoordinating {
+    func permissionState() -> ScreenCapturePermissionState
+    @discardableResult func requestPermission() -> Bool
+    func capturePreviewBundle(displayName: String) throws -> VisualContextBundle
+    func markPreviewAccepted(_ bundle: VisualContextBundle) -> VisualContextBundle
+}
+
 public struct MainDisplayScreenCapturer: ScreenImageCapturing {
     private let outputDirectory: URL
 
@@ -56,7 +63,7 @@ public struct MainDisplayScreenCapturer: ScreenImageCapturing {
     }
 }
 
-public final class ScreenContextCoordinator {
+public final class ScreenContextCoordinator: ScreenPreviewCoordinating {
     private let capturer: ScreenImageCapturing
 
     public init(capturer: ScreenImageCapturing = MainDisplayScreenCapturer()) {

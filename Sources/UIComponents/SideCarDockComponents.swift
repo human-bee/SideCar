@@ -1,4 +1,5 @@
 import AppCore
+import Foundation
 import SwiftUI
 
 struct BottomDockView: View {
@@ -146,13 +147,19 @@ private struct TalkDock: View {
     @ObservedObject var viewModel: SideCarViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             TextField("Ask SideCar. Queues follow-up unless you explicitly steer.", text: $viewModel.chatDraft)
                 .textFieldStyle(.roundedBorder)
             HStack {
                 Toggle("speech-to-speech", isOn: $viewModel.speechToSpeechEnabled)
                     .font(.system(size: 12))
                 Spacer()
+                Button("Check Realtime") {
+                    Task {
+                        await viewModel.checkRealtimeReadiness()
+                    }
+                }
+                .font(.system(size: 12))
                 Button("Request Screen Access") {
                     viewModel.requestScreenCapturePermission()
                 }
@@ -161,7 +168,92 @@ private struct TalkDock: View {
                     .font(.system(size: 11))
                     .foregroundStyle(CodexTheme.secondaryText)
             }
+            Label(viewModel.realtimeReadiness.diagnostic, systemImage: realtimeStatusIcon)
+                .font(.system(size: 11))
+                .foregroundStyle(realtimeStatusColor)
+                .lineLimit(1)
+            Text("Preview controls stage screen context only. Live speech-to-speech streaming is not implemented in this slice.")
+                .font(.system(size: 11))
+                .foregroundStyle(CodexTheme.secondaryText)
+                .lineLimit(2)
+            HStack(spacing: 8) {
+                Button("Capture Preview") {
+                    do {
+                        try viewModel.capturePreview()
+                    } catch {
+                        viewModel.clearPreview()
+                    }
+                }
+                .font(.system(size: 12))
+                Button("Accept Preview") {
+                    viewModel.acceptPreview()
+                }
+                .font(.system(size: 12))
+                .disabled(viewModel.previewBundle == nil)
+                Button("Clear Preview") {
+                    viewModel.clearPreview()
+                }
+                .font(.system(size: 12))
+                .disabled(viewModel.previewBundle == nil)
+            }
+            if let preview = viewModel.previewBundle {
+                PreviewMetadataView(preview: preview)
+            } else {
+                Text("No preview captured.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(CodexTheme.secondaryText)
+            }
         }
+    }
+
+    private var realtimeStatusIcon: String {
+        switch viewModel.realtimeReadiness.state {
+        case .missingKey:
+            return "key.slash"
+        case .ready:
+            return "checkmark.circle"
+        case .active:
+            return "waveform.badge.mic"
+        case .failed:
+            return "xmark.octagon"
+        }
+    }
+
+    private var realtimeStatusColor: Color {
+        switch viewModel.realtimeReadiness.state {
+        case .missingKey:
+            return CodexTheme.secondaryText
+        case .ready, .active:
+            return CodexTheme.statusGreen
+        case .failed:
+            return .red
+        }
+    }
+}
+
+private struct PreviewMetadataView: View {
+    var preview: VisualContextBundle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Preview: \(preview.displayName)")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(CodexTheme.primaryText)
+                .lineLimit(1)
+            Text("File: \(previewFileName)")
+                .font(.system(size: 11))
+                .foregroundStyle(CodexTheme.secondaryText)
+                .lineLimit(1)
+            Text("Accepted: \(preview.previewAccepted ? "yes" : "no") · Sent: \(preview.sentToModel ? "yes" : "no")")
+                .font(.system(size: 11))
+                .foregroundStyle(CodexTheme.secondaryText)
+        }
+        .padding(10)
+        .background(CodexTheme.cardBackground, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var previewFileName: String {
+        preview.imagePath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "none"
     }
 }
 
