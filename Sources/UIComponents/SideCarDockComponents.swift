@@ -1,4 +1,5 @@
 import AppCore
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -33,7 +34,7 @@ private struct CodexTabBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(BottomTab.allCases) { tab in
+            ForEach(BottomTab.primaryDemoTabs) { tab in
                 Button {
                     selection = tab
                 } label: {
@@ -70,7 +71,7 @@ private struct ActiveDock: View {
     }
 }
 
-private struct ThreadsDock: View {
+struct ThreadsDock: View {
     @ObservedObject var viewModel: SideCarViewModel
 
     var body: some View {
@@ -143,7 +144,7 @@ private struct ThreadSwitchboardRow: View {
     }
 }
 
-private struct TalkDock: View {
+struct TalkDock: View {
     @ObservedObject var viewModel: SideCarViewModel
 
     var body: some View {
@@ -285,7 +286,7 @@ public struct SideCarSettingsView: View {
     }
 }
 
-private struct SettingsDock: View {
+struct SettingsDock: View {
     @ObservedObject var viewModel: SideCarViewModel
 
     var body: some View {
@@ -296,11 +297,17 @@ private struct SettingsDock: View {
                     .foregroundStyle(CodexTheme.primaryText)
                 SecureField("sk-...", text: $viewModel.openAIKeyDraft)
                     .textFieldStyle(.roundedBorder)
+                    .frame(minHeight: 28)
                 HStack {
                     Label(viewModel.openAIKeyStatus.message, systemImage: statusIcon)
                         .font(.system(size: 11))
                         .foregroundStyle(statusColor)
                     Spacer()
+                    Button("Paste") {
+                        if let value = NSPasteboard.general.string(forType: .string) {
+                            viewModel.openAIKeyDraft = value
+                        }
+                    }
                     Button("Save Key") {
                         viewModel.saveOpenAIKeyDraft()
                     }

@@ -40,19 +40,18 @@ struct ToolTimelineCard: View {
                     .lineLimit(1)
             }
 
-            HStack {
-                Text("Detail")
-                    .font(.system(size: 11))
-                    .foregroundStyle(CodexTheme.secondaryText)
-                Slider(value: $zoom, in: 0...1)
-                    .frame(width: 120)
-            }
-
             if items.isEmpty {
-                Text("No current turn timeline.")
+                Text("No tool activity in the current turn.")
                     .font(.system(size: 12))
                     .foregroundStyle(CodexTheme.secondaryText)
             } else {
+                HStack {
+                    Text("Detail")
+                        .font(.system(size: 11))
+                        .foregroundStyle(CodexTheme.secondaryText)
+                    Slider(value: $zoom, in: 0...1)
+                        .frame(width: 120)
+                }
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(items) { item in
                         TimelineRow(item: item, zoom: zoom)

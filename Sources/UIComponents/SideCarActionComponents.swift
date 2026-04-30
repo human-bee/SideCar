@@ -6,8 +6,8 @@ struct VoiceAndQueueCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Voice and talk")
+            HStack(alignment: .center) {
+                Label("Talk with SideCar", systemImage: "bubble.left.and.text.bubble.right")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CodexTheme.primaryText)
                 Spacer()
@@ -15,9 +15,10 @@ struct VoiceAndQueueCard: View {
                     .font(.system(size: 11))
                     .toggleStyle(.switch)
                     .labelsHidden()
+                    .help("Enable speech-to-speech mode when the live audio loop is available.")
             }
 
-            TextField("Ask SideCar. Queues follow-up unless you explicitly steer.", text: $viewModel.chatDraft)
+            TextField("Ask about this Codex run...", text: $viewModel.chatDraft)
                 .textFieldStyle(.roundedBorder)
 
             HStack(spacing: 8) {
@@ -38,13 +39,7 @@ struct VoiceAndQueueCard: View {
                 .buttonStyle(.bordered)
 
                 Spacer()
-
-                Button("Screen Access") {
-                    viewModel.requestScreenCapturePermission()
-                }
-                .font(.system(size: 12))
-
-                Text(viewModel.screenPermission.rawValue)
+                Label(viewModel.realtimeReadiness.diagnostic, systemImage: "waveform")
                     .font(.system(size: 11))
                     .foregroundStyle(CodexTheme.secondaryText)
                     .lineLimit(1)

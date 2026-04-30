@@ -60,7 +60,7 @@ public struct SideCarThreadPresentation: Equatable {
         self.liveContext = LiveContext(
             title: Self.contextTitle(for: thread),
             detail: Self.contextDetail(for: thread),
-            badgeText: diagnostics.sourceLabel,
+            badgeText: diagnostics.demoLabel(stale: thread.freshness.isStale),
             note: note,
             progressLabel: Self.progressLabel(for: thread),
             progressValue: Self.progressValue(for: thread)
@@ -89,11 +89,13 @@ public struct SideCarThreadPresentation: Equatable {
     }
 
     private static func contextDetail(for thread: ThreadSnapshot) -> String {
-        let source = thread.freshness.source.rawValue
         if let phase = thread.currentTurn?.phase {
-            return "\(phase.rawValue) via \(source)"
+            return phase.rawValue
         }
-        return "\(thread.status.rawValue) via \(source)"
+        if thread.status == .unknown || thread.status == .idle {
+            return "No active turn"
+        }
+        return thread.status.rawValue
     }
 
     private static func progressLabel(for thread: ThreadSnapshot) -> String {

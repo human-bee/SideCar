@@ -452,11 +452,13 @@ private actor LiveReloadRace {
     }
 }
 
-public enum BottomTab: String, CaseIterable, Identifiable {
+public enum BottomTab: String, CaseIterable, Identifiable, Sendable {
     case active = "Active"
     case threads = "Threads"
     case talk = "Talk"
     case settings = "Settings"
+
+    public static let primaryDemoTabs: [BottomTab] = [.active, .threads, .talk]
 
     public var id: String { rawValue }
 }
@@ -491,6 +493,13 @@ public struct SourceDiagnostics: Equatable {
         } else {
             self.notes.append("\(probe.supportedMethods.count) app-server methods reported")
         }
+    }
+
+    public func demoLabel(stale: Bool) -> String {
+        if stale {
+            return "Refresh"
+        }
+        return isLive ? "Live" : "Demo"
     }
 }
 

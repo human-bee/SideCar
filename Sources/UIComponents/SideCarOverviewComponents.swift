@@ -2,8 +2,10 @@ import AppCore
 import SwiftUI
 
 struct SideCarHeaderView: View {
-    var thread: ThreadSnapshot
-    var diagnostics: SourceDiagnostics
+    @ObservedObject var viewModel: SideCarViewModel
+
+    private var thread: ThreadSnapshot { viewModel.activeThread }
+    private var diagnostics: SourceDiagnostics { viewModel.sourceDiagnostics }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -14,7 +16,7 @@ struct SideCarHeaderView: View {
                 Text("SideCar")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CodexTheme.primaryText)
-                Text(thread.title)
+                Text("Codex companion")
                     .font(.system(size: 12))
                     .foregroundStyle(CodexTheme.secondaryText)
                     .lineLimit(1)
@@ -22,6 +24,34 @@ struct SideCarHeaderView: View {
             }
             Spacer()
             SourcePill(diagnostics: diagnostics, stale: thread.freshness.isStale)
+            HeaderIconButton(
+                icon: "rectangle.stack",
+                help: "Active",
+                isSelected: viewModel.selectedBottomTab == .active
+            ) {
+                viewModel.selectedBottomTab = .active
+            }
+            HeaderIconButton(
+                icon: "list.bullet.rectangle",
+                help: "Threads",
+                isSelected: viewModel.selectedBottomTab == .threads
+            ) {
+                viewModel.selectedBottomTab = .threads
+            }
+            HeaderIconButton(
+                icon: "waveform",
+                help: "Talk",
+                isSelected: viewModel.selectedBottomTab == .talk
+            ) {
+                viewModel.selectedBottomTab = .talk
+            }
+            HeaderIconButton(
+                icon: "slider.horizontal.3",
+                help: "Settings",
+                isSelected: viewModel.selectedBottomTab == .settings
+            ) {
+                viewModel.selectedBottomTab = .settings
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -42,6 +72,25 @@ struct SideCarHeaderView: View {
     }
 }
 
+private struct HeaderIconButton: View {
+    var icon: String
+    var help: String
+    var isSelected: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white : CodexTheme.secondaryText)
+                .frame(width: 28, height: 26)
+                .background(isSelected ? CodexTheme.accent : CodexTheme.controlBackground, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+}
+
 struct ActiveThreadCard: View {
     var thread: ThreadSnapshot
     var diagnostics: SourceDiagnostics
@@ -50,6 +99,9 @@ struct ActiveThreadCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
+                    Text("Active thread")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CodexTheme.secondaryText)
                     Text(thread.title)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(CodexTheme.primaryText)
@@ -57,7 +109,7 @@ struct ActiveThreadCard: View {
                     Text(thread.summary)
                         .font(.system(size: 13))
                         .foregroundStyle(CodexTheme.secondaryText)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 4) {
@@ -74,7 +126,6 @@ struct ActiveThreadCard: View {
             }
 
             HStack(spacing: 8) {
-                SourcePill(diagnostics: diagnostics, stale: thread.freshness.isStale)
                 if let cwd = thread.cwd {
                     Label(cwd, systemImage: "folder")
                         .font(.system(size: 11))
@@ -118,7 +169,7 @@ struct LiveContextCard: View {
             }
             .progressViewStyle(.linear)
 
-            if let note = presentation.liveContext.note {
+            if let note = presentation.liveContext.note, presentation.liveContext.title != "Needs refresh" {
                 Text(note)
                     .font(.system(size: 11))
                     .foregroundStyle(CodexTheme.secondaryText)
@@ -135,9 +186,9 @@ struct SourcePill: View {
     var stale: Bool
 
     var body: some View {
-        Label(stale ? "\(diagnostics.sourceLabel) stale" : diagnostics.sourceLabel, systemImage: diagnostics.isLive ? "dot.radiowaves.left.and.right" : "shippingbox")
+        Label(diagnostics.demoLabel(stale: stale), systemImage: diagnostics.isLive ? "dot.radiowaves.left.and.right" : "shippingbox")
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(diagnostics.isLive ? CodexTheme.statusGreen : CodexTheme.secondaryText)
+            .foregroundStyle(stale ? CodexTheme.accent : (diagnostics.isLive ? CodexTheme.statusGreen : CodexTheme.secondaryText))
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(CodexTheme.controlBackground, in: Capsule())

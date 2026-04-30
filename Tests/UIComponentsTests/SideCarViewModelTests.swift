@@ -258,6 +258,39 @@ final class SideCarViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.realtimeReadiness.state, .ready)
     }
 
+    func testDemoNavigationKeepsSettingsOutOfPrimaryTabs() {
+        XCTAssertEqual(BottomTab.primaryDemoTabs, [.active, .threads, .talk])
+        XCTAssertFalse(BottomTab.primaryDemoTabs.contains(.settings))
+    }
+
+    func testSourceDiagnosticsUsesCompactDemoLabel() {
+        let liveThread = ThreadSnapshot(
+            id: "live",
+            title: "Live thread",
+            status: .running,
+            freshness: Freshness(source: .appServerLive),
+            summary: "Running"
+        )
+        let staleThread = ThreadSnapshot(
+            id: "stale",
+            title: "Stale thread",
+            status: .running,
+            freshness: Freshness(source: .appServerLive, isStale: true),
+            summary: "Old"
+        )
+        let liveDiagnostics = SourceDiagnostics(
+            activeThread: liveThread,
+            probe: CapabilityProbe(appServerAvailable: true, transport: "app-server")
+        )
+        let staleDiagnostics = SourceDiagnostics(
+            activeThread: staleThread,
+            probe: CapabilityProbe(appServerAvailable: true, transport: "app-server")
+        )
+
+        XCTAssertEqual(liveDiagnostics.demoLabel(stale: false), "Live")
+        XCTAssertEqual(staleDiagnostics.demoLabel(stale: true), "Refresh")
+    }
+
     func testReloadTimeoutKeepsFixtureDataWhenLiveSourceHangs() async {
         let viewModel = SideCarViewModel(
             repository: StubThreadRepository(threads: Self.threadFixtures),

@@ -95,6 +95,8 @@ MVP intentionally excludes direct shell execution, filesystem writes, config wri
 
 See [docs/architecture.md](docs/architecture.md), [docs/privacy.md](docs/privacy.md), [docs/security.md](docs/security.md), and [docs/compatibility.md](docs/compatibility.md).
 
+For a tight review walkthrough, use [docs/demo-script.md](docs/demo-script.md).
+
 ## Contributing
 
 Start with [docs/contributing.md](docs/contributing.md). Please include tests for contract changes and avoid committing private Codex rollouts, sqlite databases, screenshots, API keys, or `.env` files.
