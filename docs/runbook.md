@@ -32,11 +32,11 @@ On launch, SideCar tries to probe the bundled Codex app binary at:
 /Applications/Codex.app/Contents/Resources/codex
 ```
 
-SideCar currently tries the app-server proxy first, then falls back to direct `stdio://` app-server. Live mode performs initialize and bounded `thread/list` loading for recent thread snapshots. The notification pump can parse app-server event frames during request/response traffic; an independent long-lived stream reader is the next integration milestone.
+SideCar currently tries the app-server proxy first, then falls back to direct `stdio://` app-server. Live mode performs initialize and bounded `thread/list` loading for recent thread snapshots. `CodexAdapter` includes tested stream-reader and reducer contracts for app-server notifications; wiring that reader into a persistent live app session is the next integration milestone.
 
 Confirmed live actions are not retried after a post-request failure. This avoids replaying side effects such as `turn/start`, `turn/steer`, or `thread/fork` if the proxy path sent the request but response parsing failed.
 
-Approval cards are draft-only in this build. The app-server approval flow is server-initiated JSON-RPC request/response, so accept/decline execution needs request-id response plumbing before it can be enabled safely.
+Approval cards are draft-only in this build. The app-server approval flow is server-initiated JSON-RPC request/response. SideCar can decode command/file approval requests and encode accept/decline responses with the same request id, but live execution still needs same-connection response plumbing before it can be enabled safely.
 
 ## OpenAI Key
 
@@ -72,4 +72,4 @@ rm -f "$tmp"
 
 ## Screen Capture
 
-The Talk dock includes a Screen Recording permission request. Captured visual context must remain preview-gated before model send.
+The Talk dock includes Realtime readiness checks, a Screen Recording permission request, capture preview, accept preview, and clear preview controls. Captured visual context remains preview-gated and is not automatically sent to a model.

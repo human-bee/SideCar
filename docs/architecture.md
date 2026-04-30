@@ -7,7 +7,7 @@ SideCar is a native macOS companion app for Codex Desktop. The architecture is i
 - `SideCarApp`: AppKit process shell, menu bar item, floating panel.
 - `UIComponents`: SwiftUI surface for status, timeline map, thread switchboard, talk dock, and confirmation cards.
 - `AppCore`: SideCar-owned contracts and action gates.
-- `CodexAdapter`: Codex app-server JSON-RPC client, notification parser/pump, optional Codex++ active-thread bridge, read-only sqlite/rollout fallbacks.
+- `CodexAdapter`: Codex app-server JSON-RPC client, notification parser/pump, stream reader/reducer contracts, approval request/response contracts, optional Codex++ active-thread bridge, read-only sqlite/rollout fallbacks.
 - `ThreadStore`: fixture, cache, and search layer.
 - `VoiceCore`: Realtime token broker, voice tool policy, and screen-context consent helpers.
 
@@ -15,7 +15,7 @@ SideCar is a native macOS companion app for Codex Desktop. The architecture is i
 
 Live mode should use Codex app-server as the authoritative source for thread status, turn lifecycle, item events, and safe thread controls.
 
-Current MVP live loading is intentionally bounded: startup uses recent `thread/list` snapshots to avoid blocking launch on very large thread reads. The notification pump parses app-server event frames during request/response traffic; a dedicated long-lived reader is the next integration step.
+Current MVP live loading is intentionally bounded: startup uses recent `thread/list` snapshots to avoid blocking launch on very large thread reads. `CodexAdapter` has tested notification reader and reducer contracts for app-server event frames; wiring that reader into a dedicated long-lived app session is the next integration step.
 
 Active-thread resolution order:
 
@@ -40,7 +40,7 @@ MVP actions are limited to safe thread-level controls:
 
 Every mutation is staged as a `SideCarAction` and must pass `ActionGate` before execution. The target card must show thread id, turn id when relevant, action kind, and payload preview.
 
-Approval cards are currently inspection/staging only. Codex app-server approvals are server-initiated JSON-RPC requests, so executing accept/decline requires preserving the request id and writing a JSON-RPC response on the same connection. SideCar intentionally does not fake that as a normal client method call.
+Approval cards are currently inspection/staging only. Codex app-server approvals are server-initiated JSON-RPC requests. SideCar now models command/file approval requests, preserves the server request id on normalized approval timeline items, and encodes approval JSON-RPC responses. Live accept/decline remains disabled until those responses are written on the same active app-server connection. SideCar intentionally does not fake approvals as normal client method calls.
 
 Explicitly excluded from MVP:
 
@@ -54,8 +54,8 @@ Explicitly excluded from MVP:
 
 ## Realtime Voice
 
-Voice is speech-to-action by default. The app mints ephemeral Realtime sessions through a native broker using a BYO OpenAI key from Keychain. Voice tools may inspect and draft freely, but all mutations stage an action card and require confirmation.
+Voice is speech-to-action by default. The app mints ephemeral Realtime sessions through a native broker using a BYO OpenAI key from Keychain. Talk mode can check Realtime readiness and show redacted session diagnostics. Voice tools may inspect and draft freely, but all mutations stage an action card and require confirmation. Full live audio streaming remains future work.
 
 ## Screen Awareness
 
-Full-desktop capture is permissioned and on-demand/event-driven. Before visual context is sent to a model, the user must preview and accept the capture for that session.
+Full-desktop capture is permissioned and on-demand/event-driven. Talk mode can capture preview metadata, accept a preview, and clear it. Before visual context is sent to a model, the user must preview and accept the capture for that session; this build does not automatically send captured images.

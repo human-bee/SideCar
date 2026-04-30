@@ -11,15 +11,17 @@ This repository is a two-hour MVP scaffold, not a finished Codex automation prod
 - Fixture/demo mode that runs without private Codex state.
 - Safe action-gating contracts for queued messages, steer, fork, interrupt, review, compact, and approvals.
 - Live Codex app-server snapshot loading through initialize, `thread/list`, and `thread/read`.
+- App-server notification stream reader/reducer contracts for thread, turn, item, command-output, and approval-request events.
 - Confirmed safe actions can be sent to the live Codex app-server for the MVP-supported methods.
-- Approval cards are visible and scoped, but remain draft-only until SideCar can answer app-server server-initiated approval requests by request id.
+- Approval cards are visible and scoped; app-server approval request ids and response payloads are modeled, but live approval fulfillment remains disabled until the same-connection response path is wired.
+- Realtime readiness and screen-preview controls are available in Talk mode without sending visual context to a model.
 - Documentation for architecture, privacy, compatibility, and design direction.
 
-Current limitations are intentional: approval request-response execution, independent long-lived app-server streaming, signed/notarized distribution, full voice audio loop wiring, and production-grade ScreenCaptureKit UX are roadmap items.
+Current limitations are intentional: wiring the independent stream reader into app state, live approval response execution, signed/notarized distribution, full voice audio loop wiring, and production-grade ScreenCaptureKit UX are roadmap items.
 
 ## Roadmap
 
-1. Promote the app-server notification pump into an independent long-lived stream reader for `item/*`, `turn/*`, and approval requests.
+1. Wire the app-server stream reader into the app session lifecycle and live UI state.
 2. Promote fixture snapshots into sanitized regression fixtures.
 3. Add signed/notarized macOS packaging.
 4. Expand visual context consent UX before enabling richer screen-aware features.
@@ -39,6 +41,7 @@ Clone the repository, then run the Swift package checks:
 ```bash
 swift test
 swift build
+make audit-share
 ```
 
 Run fixture mode:

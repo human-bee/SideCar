@@ -10,9 +10,11 @@ SideCar is a local-first macOS companion for Codex Desktop. It explores a second
 - Codex-inspired light/dark visual system.
 - Fixture mode for safe demos without private Codex state.
 - Live Codex app-server snapshot loading with `initialize`, `thread/list`, and `thread/read`.
+- App-server event stream reader/reducer and approval request/response contracts with fixture tests.
 - Safe action staging and confirmation for supported thread-level app-server methods.
 - Realtime `gpt-realtime-1.5` session broker seams using Keychain or local dev `OPENAI_API_KEY`.
-- Screen-capture consent model without automatic model send.
+- Realtime readiness check plus screen-capture preview consent controls without automatic model send.
+- Quieter single-column SideCar UI inspired by the design exploration.
 - Swift test suite and GitHub Actions.
 
 ## Why It Matters
@@ -31,8 +33,9 @@ SideCar deliberately excludes direct shell execution, arbitrary filesystem write
 
 ## Known Gaps
 
-- Continuous `item/*`, `turn/*`, and approval request event streaming is not finished.
-- Realtime audio loop is not fully wired; session minting is proven.
+- Continuous `item/*`, `turn/*`, and approval request event parsing/reducing is modeled, but not yet wired into a persistent live app session.
+- Realtime audio loop is not fully wired; session minting/readiness is proven.
+- Approval request/response contracts are modeled, but live accept/decline is not wired to the same active app-server connection.
 - Active frontmost Codex thread bridge through Codex++ is optional and not fully integrated.
 - Global hotkey is currently active-app scaffolding, not a hardened system-wide shortcut.
 - Notarized app packaging is not done.
@@ -40,13 +43,13 @@ SideCar deliberately excludes direct shell execution, arbitrary filesystem write
 ## Suggested Demo Path
 
 1. Run `swift test`.
-2. Run `swift run SideCar`.
+2. Run `make app && open -n dist/SideCar.app`.
 3. Show fixture fallback and source diagnostics.
 4. Open a live Codex Desktop session and refresh SideCar to load recent threads.
 5. Stage a queued message and show target-card confirmation.
-6. Show Settings key entry and explain Realtime session minting.
+6. Show Settings key entry, Talk mode Realtime check, and screen preview consent.
 7. Review `docs/security.md` and `docs/compatibility.md`.
 
 ## Near-Term Finish Line
 
-The next meaningful technical milestone is event streaming plus approval UI. That turns SideCar from a live snapshot/control prototype into the intended long-running companion.
+The next meaningful technical milestone is one persistent app-server session that keeps the stream reader alive, updates UI state in realtime, and writes approval responses back on the same connection.
