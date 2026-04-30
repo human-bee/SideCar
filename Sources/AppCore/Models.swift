@@ -151,6 +151,47 @@ public struct ThreadSnapshot: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+public struct PendingApprovalCenter: Equatable, Sendable {
+    public struct Scope: Equatable, Sendable {
+        public var threadId: String
+        public var turnId: String
+
+        public init(threadId: String, turnId: String) {
+            self.threadId = threadId
+            self.turnId = turnId
+        }
+    }
+
+    public var scope: Scope
+    public var items: [TimelineItem]
+
+    public init?(thread: ThreadSnapshot) {
+        guard
+            let turn = thread.currentTurn,
+            let items = Self.pendingItems(turn: turn)
+        else {
+            return nil
+        }
+
+        self.scope = Scope(threadId: thread.id, turnId: turn.id)
+        self.items = items
+    }
+
+    public var count: Int {
+        items.count
+    }
+
+    private static func pendingItems(turn: TurnSnapshot) -> [TimelineItem]? {
+        let blockingItems = turn.blockers.filter { $0.kind == .approval }
+        if !blockingItems.isEmpty {
+            return blockingItems
+        }
+
+        let groupedItems = turn.itemGroups.filter { $0.kind == .approval }
+        return groupedItems.isEmpty ? nil : groupedItems
+    }
+}
+
 public enum SideCarActionKind: String, Codable, Sendable, CaseIterable {
     case queueMessage
     case steerTurn
