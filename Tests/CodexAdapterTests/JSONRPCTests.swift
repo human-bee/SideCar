@@ -198,6 +198,176 @@ import Testing
     #expect(event == .unknown(method: "fs/write", params: .object(["path": .string("blocked.txt")])))
 }
 
+@Test func notificationPumpEmitsKnownNotification() throws {
+    let pump = CodexServerNotificationPump()
+    let line = jsonLineData("""
+    {
+      "jsonrpc": "2.0",
+      "method": "turn/started",
+      "params": {
+        "threadId": "thread-1",
+        "turnId": "turn-1",
+        "startedAt": 1777588800
+      }
+    }
+    """)
+
+    let event = try #require(pump.consume(line: line))
+
+    guard case .notification(.turnStarted(let payload)) = event else {
+        Issue.record("Expected turn/started stream event")
+        return
+    }
+
+    #expect(payload.threadId == "thread-1")
+    #expect(payload.turnId == "turn-1")
+}
+
+@Test func notificationPumpKeepsUnknownNotificationMethods() throws {
+    let pump = CodexServerNotificationPump()
+    let line = jsonLineData("""
+    {
+      "jsonrpc": "2.0",
+      "method": "custom/notice",
+      "params": {
+        "state": "warming"
+      }
+    }
+    """)
+
+    let event = try #require(pump.consume(line: line))
+
+    guard case .notification(.unknown(let method, let params)) = event else {
+        Issue.record("Expected unknown notification stream event")
+        return
+    }
+
+    #expect(method == "custom/notice")
+    #expect(params == .object(["state": .string("warming")]))
+}
+
+@Test func notificationPumpIgnoresResponsesAndRequests() throws {
+    let pump = CodexServerNotificationPump()
+
+    let response = pump.consume(line: jsonLineData("""
+    {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "result": {
+        "ok": true
+      }
+    }
+    """))
+    let request = pump.consume(line: jsonLineData("""
+    {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "thread/list",
+      "params": {
+        "limit": 10
+      }
+    }
+    """))
+
+    #expect(response == nil)
+    #expect(request == nil)
+}
+
+@Test func notificationPumpSurfacesMalformedPayloadDeterministically() throws {
+    let pump = CodexServerNotificationPump()
+    let line = jsonLineData("""
+    {
+      "jsonrpc": "2.0",
+      "method": "turn/started",
+      "params": {
+        "threadId": "thread-1"
+      }
+    }
+    """)
+
+    let event = try #require(pump.consume(line: line))
+
+    guard case .malformed(let error) = event else {
+        Issue.record("Expected malformed notification event")
+        return
+    }
+
+    #expect(error.method == "turn/started")
+    #expect(error.line.contains("\"method\":\"turn"))
+    #expect(error.line.contains("started\""))
+    #expect(error.line.contains("\"threadId\":\"thread-1\""))
+}
+
+@Test func notificationPumpPreservesLineOrderAcrossMixedFrames() throws {
+    let pump = CodexServerNotificationPump()
+    let lines = [
+        jsonLineData("""
+        {
+          "jsonrpc": "2.0",
+          "method": "thread/status/changed",
+          "params": {
+            "threadId": "thread-1",
+            "status": "active"
+          }
+        }
+        """),
+        jsonLineData("""
+        {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "result": {
+            "ignored": true
+          }
+        }
+        """),
+        jsonLineData("""
+        {
+          "jsonrpc": "2.0",
+          "method": "custom/notice",
+          "params": {
+            "step": 2
+          }
+        }
+        """),
+        jsonLineData("""
+        {
+          "jsonrpc": "2.0",
+          "method": "turn/completed",
+          "params": {
+            "threadId": "thread-1",
+            "turnId": "turn-1",
+            "status": "completed"
+          }
+        }
+        """)
+    ]
+
+    let events = lines.compactMap { pump.consume(line: $0) }
+
+    #expect(events.count == 3)
+    guard case .notification(.threadStatusChanged(let statusPayload)) = events[0] else {
+        Issue.record("Expected first event to be thread/status/changed")
+        return
+    }
+    #expect(statusPayload.threadId == "thread-1")
+    #expect(statusPayload.status == "active")
+
+    guard case .notification(.unknown(let method, let params)) = events[1] else {
+        Issue.record("Expected second event to be unknown notification")
+        return
+    }
+    #expect(method == "custom/notice")
+    #expect(params == .object(["step": .number(2)]))
+
+    guard case .notification(.turnCompleted(let completedPayload)) = events[2] else {
+        Issue.record("Expected third event to be turn/completed")
+        return
+    }
+    #expect(completedPayload.threadId == "thread-1")
+    #expect(completedPayload.turnId == "turn-1")
+    #expect(completedPayload.status == "completed")
+}
+
 @Test func liveActionRequestBuildsTurnStart() throws {
     let action = SideCarAction(
         kind: .queueMessage,
@@ -375,4 +545,9 @@ private final class MockCodexTransport: CodexAppServerTransport {
 private func decodeNotification(_ json: String) throws -> JSONRPCNotification {
     let data = Data(json.utf8)
     return try JSONRPCCodec.decodeNotification(data)
+}
+
+private func jsonLineData(_ json: String) -> Data {
+    let object = try! JSONSerialization.jsonObject(with: Data(json.utf8))
+    return try! JSONSerialization.data(withJSONObject: object, options: [])
 }

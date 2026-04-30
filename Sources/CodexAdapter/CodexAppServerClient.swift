@@ -42,11 +42,17 @@ public protocol CodexAppServerTransport: AnyObject {
     func notify(method: String, params: JSONValue?) throws
 }
 
+public protocol CodexServerNotificationEventSink: AnyObject {
+    func handleNotificationStreamEvent(_ event: CodexServerNotificationStreamEvent)
+}
+
 public final class CodexProcessTransport: CodexAppServerTransport {
     public static let bundledCodexPath = "/Applications/Codex.app/Contents/Resources/codex"
     public static let blockedMethods: Set<String> = ActionGate.excludedCapabilities
 
     private let codexPath: String
+    private let notificationEventSink: CodexServerNotificationEventSink?
+    private let notificationPump = CodexServerNotificationPump()
     private var process: Process?
     private var inputPipe: Pipe?
     private var outputPipe: Pipe?
@@ -54,8 +60,12 @@ public final class CodexProcessTransport: CodexAppServerTransport {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    public init(codexPath: String = CodexProcessTransport.bundledCodexPath) {
+    public init(
+        codexPath: String = CodexProcessTransport.bundledCodexPath,
+        notificationEventSink: CodexServerNotificationEventSink? = nil
+    ) {
         self.codexPath = codexPath
+        self.notificationEventSink = notificationEventSink
     }
 
     public func start(mode: CodexAppServerLaunchMode) throws {
@@ -112,6 +122,10 @@ public final class CodexProcessTransport: CodexAppServerTransport {
             let responseData = try readLine(from: outputPipe.fileHandleForReading)
             guard !responseData.isEmpty else {
                 throw CodexAppServerError.malformedResponse
+            }
+            if let event = notificationPump.consume(line: responseData) {
+                notificationEventSink?.handleNotificationStreamEvent(event)
+                continue
             }
             let response = try JSONRPCCodec.decodeResponse(responseData)
             guard response.id == request.id else {
