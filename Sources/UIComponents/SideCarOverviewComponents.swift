@@ -16,7 +16,7 @@ struct SideCarHeaderView: View {
                 Text("SideCar")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CodexTheme.primaryText)
-                Text("Codex companion")
+                Text(thread.title)
                     .font(.system(size: 12))
                     .foregroundStyle(CodexTheme.secondaryText)
                     .lineLimit(1)
@@ -56,6 +56,7 @@ struct SideCarHeaderView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(CodexTheme.contentBackground)
+        .help("\(thread.title) · \(diagnostics.sourceDetail)")
     }
 
     private var statusColor: Color {
@@ -169,7 +170,7 @@ struct LiveContextCard: View {
             }
             .progressViewStyle(.linear)
 
-            if let note = presentation.liveContext.note, presentation.liveContext.title != "Needs refresh" {
+            if let note = presentation.liveContext.note {
                 Text(note)
                     .font(.system(size: 11))
                     .foregroundStyle(CodexTheme.secondaryText)
@@ -193,6 +194,7 @@ struct SourcePill: View {
             .padding(.vertical, 5)
             .background(CodexTheme.controlBackground, in: Capsule())
             .lineLimit(1)
+            .help(diagnostics.sourceDetail)
     }
 }
 

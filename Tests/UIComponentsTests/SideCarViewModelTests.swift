@@ -186,7 +186,7 @@ final class SideCarViewModelTests: XCTestCase {
             id: "stale",
             title: "Stale thread",
             status: .running,
-            freshness: Freshness(source: .fixture, isStale: true),
+            freshness: Freshness(source: .fixture, isStale: true, note: "Live app-server reload timed out; staying in fixture mode."),
             summary: "Old state"
         )
         let diagnostics = SourceDiagnostics(
@@ -197,6 +197,7 @@ final class SideCarViewModelTests: XCTestCase {
         let presentation = SideCarThreadPresentation(thread: thread, diagnostics: diagnostics)
 
         XCTAssertEqual(presentation.liveContext.title, "Needs refresh")
+        XCTAssertEqual(presentation.liveContext.note, "Live app-server reload timed out; staying in fixture mode.")
         XCTAssertEqual(presentation.liveContext.progressValue, 0.2)
         XCTAssertEqual(presentation.timelineSummary.totalCount, 0)
     }
@@ -258,6 +259,30 @@ final class SideCarViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.realtimeReadiness.state, .ready)
     }
 
+    func testTalkModeCanStageQueueAndSteerFromDraft() {
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: [SampleData.activeThread]),
+            openAIKeyAvailable: { false }
+        )
+        viewModel.selectedBottomTab = .talk
+
+        viewModel.chatDraft = "queue from talk"
+        viewModel.stageMessage(asSteer: false)
+
+        XCTAssertEqual(viewModel.stagedAction?.kind, .queueMessage)
+        XCTAssertEqual(viewModel.stagedAction?.targetThreadId, SampleData.activeThread.id)
+        XCTAssertNil(viewModel.stagedAction?.targetTurnId)
+        XCTAssertEqual(viewModel.stagedAction?.payloadPreview, "queue from talk")
+
+        viewModel.chatDraft = "steer from talk"
+        viewModel.stageMessage(asSteer: true)
+
+        XCTAssertEqual(viewModel.stagedAction?.kind, .steerTurn)
+        XCTAssertEqual(viewModel.stagedAction?.targetThreadId, SampleData.activeThread.id)
+        XCTAssertEqual(viewModel.stagedAction?.targetTurnId, SampleData.activeThread.currentTurn?.id)
+        XCTAssertEqual(viewModel.stagedAction?.payloadPreview, "steer from talk")
+    }
+
     func testDemoNavigationKeepsSettingsOutOfPrimaryTabs() {
         XCTAssertEqual(BottomTab.primaryDemoTabs, [.active, .threads, .talk])
         XCTAssertFalse(BottomTab.primaryDemoTabs.contains(.settings))
@@ -289,6 +314,39 @@ final class SideCarViewModelTests: XCTestCase {
 
         XCTAssertEqual(liveDiagnostics.demoLabel(stale: false), "Live")
         XCTAssertEqual(staleDiagnostics.demoLabel(stale: true), "Refresh")
+        XCTAssertEqual(liveDiagnostics.sourceDetail, "appServerLive via app-server")
+    }
+
+    func testPasteOpenAIKeyRejectsNonKeyClipboardTextWithoutOverwritingDraft() {
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            openAIKeyAvailable: { false }
+        )
+        viewModel.openAIKeyDraft = "sk-existing-value"
+
+        viewModel.pasteOpenAIKey("password from another app\nsecond line")
+
+        XCTAssertEqual(viewModel.openAIKeyDraft, "sk-existing-value")
+        XCTAssertEqual(viewModel.openAIKeyStatus, .failed("Clipboard does not look like an OpenAI API key"))
+
+        viewModel.pasteOpenAIKey("  sk-test-value  ")
+
+        XCTAssertEqual(viewModel.openAIKeyDraft, "sk-test-value")
+    }
+
+    func testSaveOpenAIKeyRejectsNonKeyDraft() {
+        var savedKey: String?
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            saveOpenAIKey: { savedKey = $0 },
+            openAIKeyAvailable: { false }
+        )
+        viewModel.openAIKeyDraft = "not a key"
+
+        viewModel.saveOpenAIKeyDraft()
+
+        XCTAssertNil(savedKey)
+        XCTAssertEqual(viewModel.openAIKeyStatus, .failed("OpenAI key must start with sk- and contain no whitespace"))
     }
 
     func testReloadTimeoutKeepsFixtureDataWhenLiveSourceHangs() async {

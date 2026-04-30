@@ -14,10 +14,11 @@ SideCar should feel native to Codex Desktop while reducing visual noise.
 
 - Floating side panel.
 - Header with active thread, state, and freshness source.
+- Header icon navigation for Active, Threads, Talk, and Settings.
 - Status summary.
 - Zoomable timeline map.
 - Recommendations and next action.
-- Bottom dock with Active, Threads, and Talk modes.
+- Talk surface with target thread identity, queue, steer, `/side`, Realtime readiness, and screen-preview controls.
 - Confirmation cards for staged actions.
 
 ## Image Generation Prompt Seeds

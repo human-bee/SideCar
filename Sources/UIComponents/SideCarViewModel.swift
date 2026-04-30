@@ -315,6 +315,10 @@ public final class SideCarViewModel: ObservableObject {
             openAIKeyStatus = .needsAttention("Paste an OpenAI API key before saving")
             return
         }
+        guard Self.isValidOpenAIKeyCandidate(trimmed) else {
+            openAIKeyStatus = .failed("OpenAI key must start with sk- and contain no whitespace")
+            return
+        }
         do {
             try saveOpenAIKey(trimmed)
             openAIKeyDraft = ""
@@ -322,6 +326,20 @@ public final class SideCarViewModel: ObservableObject {
         } catch {
             openAIKeyStatus = .failed("Could not save key: \(error)")
         }
+    }
+
+    public func pasteOpenAIKey(_ clipboardText: String?) {
+        guard let clipboardText else { return }
+        let trimmed = clipboardText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.isValidOpenAIKeyCandidate(trimmed) else {
+            openAIKeyStatus = .failed("Clipboard does not look like an OpenAI API key")
+            return
+        }
+        openAIKeyDraft = trimmed
+    }
+
+    private static func isValidOpenAIKeyCandidate(_ value: String) -> Bool {
+        value.hasPrefix("sk-") && value.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
     }
 
     public var sourceDiagnostics: SourceDiagnostics {

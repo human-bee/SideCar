@@ -75,26 +75,23 @@ struct ThreadsDock: View {
     @ObservedObject var viewModel: SideCarViewModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(viewModel.groupedThreads)) { group in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("\(group.kind.rawValue) (\(group.threads.count))")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(CodexTheme.secondaryText)
-                        ForEach(group.threads) { thread in
-                            Button {
-                                viewModel.selectThread(thread.id)
-                            } label: {
-                                ThreadSwitchboardRow(thread: thread, isSelected: viewModel.selectedThreadId == thread.id)
-                            }
-                            .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(viewModel.groupedThreads)) { group in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(group.kind.rawValue) (\(group.threads.count))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(CodexTheme.secondaryText)
+                    ForEach(group.threads) { thread in
+                        Button {
+                            viewModel.selectThread(thread.id)
+                        } label: {
+                            ThreadSwitchboardRow(thread: thread, isSelected: viewModel.selectedThreadId == thread.id)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
         }
-        .frame(maxHeight: 210)
     }
 }
 
@@ -149,6 +146,7 @@ struct TalkDock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            TalkTargetStrip(thread: viewModel.activeThread, diagnostics: viewModel.sourceDiagnostics)
             TextField("Ask SideCar. Queues follow-up unless you explicitly steer.", text: $viewModel.chatDraft)
                 .textFieldStyle(.roundedBorder)
             HStack {
@@ -157,6 +155,16 @@ struct TalkDock: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .help("Open a guarded side conversation from the current thread context.")
+
+                Button("Queue") {
+                    viewModel.stageMessage(asSteer: false)
+                }
+                .buttonStyle(.bordered)
+
+                Button("Steer") {
+                    viewModel.stageMessage(asSteer: true)
+                }
+                .buttonStyle(.bordered)
 
                 Toggle("speech-to-speech", isOn: $viewModel.speechToSpeechEnabled)
                     .font(.system(size: 12))
@@ -238,6 +246,32 @@ struct TalkDock: View {
     }
 }
 
+private struct TalkTargetStrip: View {
+    var thread: ThreadSnapshot
+    var diagnostics: SourceDiagnostics
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "scope")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CodexTheme.secondaryText)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(thread.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CodexTheme.primaryText)
+                    .lineLimit(1)
+                Text(diagnostics.sourceDetail)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(CodexTheme.secondaryText)
+                    .lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(10)
+        .background(CodexTheme.cardBackground, in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
 private struct PreviewMetadataView: View {
     var preview: VisualContextBundle
 
@@ -304,9 +338,7 @@ struct SettingsDock: View {
                         .foregroundStyle(statusColor)
                     Spacer()
                     Button("Paste") {
-                        if let value = NSPasteboard.general.string(forType: .string) {
-                            viewModel.openAIKeyDraft = value
-                        }
+                        viewModel.pasteOpenAIKey(NSPasteboard.general.string(forType: .string))
                     }
                     Button("Save Key") {
                         viewModel.saveOpenAIKeyDraft()
