@@ -17,6 +17,9 @@ public struct SideCarRootView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     SourceDiagnosticsView(diagnostics: viewModel.sourceDiagnostics)
                     StatusSummaryView(thread: viewModel.activeThread)
+                    if let approvalCenter = viewModel.pendingApprovalCenter {
+                        ApprovalCenterView(approvalCenter: approvalCenter, viewModel: viewModel)
+                    }
                     TimelineMapView(
                         items: viewModel.activeThread.currentTurn?.itemGroups ?? [],
                         zoom: $viewModel.timelineZoom
@@ -35,6 +38,70 @@ public struct SideCarRootView: View {
         .frame(minWidth: 430, idealWidth: 500, minHeight: 640, idealHeight: 760)
         .background(CodexTheme.contentBackground)
         .tint(CodexTheme.accent)
+    }
+}
+
+private struct ApprovalCenterView: View {
+    var approvalCenter: PendingApprovalCenter
+    @ObservedObject var viewModel: SideCarViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Label("Approval Center", systemImage: "hand.raised")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CodexTheme.primaryText)
+                Spacer()
+                Text("\(approvalCenter.count) pending")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CodexTheme.secondaryText)
+            }
+            Text("thread \(approvalCenter.scope.threadId) • turn \(approvalCenter.scope.turnId)")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(CodexTheme.secondaryText)
+                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(approvalCenter.items) { item in
+                    ApprovalRow(item: item) { approved in
+                        viewModel.stageApprovalDecision(approved: approved, itemID: item.id)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+private struct ApprovalRow: View {
+    var item: TimelineItem
+    var onDecision: (Bool) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CodexTheme.primaryText)
+                Text(item.summary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(CodexTheme.secondaryText)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 12)
+            HStack(spacing: 6) {
+                Button("Decline") {
+                    onDecision(false)
+                }
+                .buttonStyle(.borderless)
+
+                Button("Accept") {
+                    onDecision(true)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 
@@ -286,6 +353,12 @@ private struct StagedActionCard: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(CodexTheme.secondaryText)
                 .lineLimit(1)
+            if let targetTurnId = action.targetTurnId {
+                Text(targetTurnId)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(CodexTheme.secondaryText)
+                    .lineLimit(1)
+            }
             Text(action.payloadPreview)
                 .font(.system(size: 12))
                 .foregroundStyle(CodexTheme.primaryText)

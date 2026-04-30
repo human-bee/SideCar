@@ -94,6 +94,99 @@ final class SideCarViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.capabilityProbe.notes.contains("Live app-server reload timed out; staying in fixture mode."))
     }
 
+    func testPendingApprovalsPreferBlockersAndFallbackToTimelineItems() {
+        let blockingApproval = TimelineItem(
+            id: "approval-blocker",
+            kind: .approval,
+            title: "Approve shell command",
+            summary: "Needs explicit review",
+            source: .appServerLive
+        )
+        let timelineApproval = TimelineItem(
+            id: "approval-item",
+            kind: .approval,
+            title: "Approve network access",
+            summary: "Allow loopback-only request",
+            source: .appServerLive
+        )
+        let thread = ThreadSnapshot(
+            id: "approval-thread",
+            title: "Approval thread",
+            status: .waitingForApproval,
+            freshness: Freshness(source: .appServerLive),
+            currentTurn: TurnSnapshot(
+                id: "turn-approval",
+                phase: .waitingForApproval,
+                itemGroups: [timelineApproval],
+                blockers: [blockingApproval]
+            ),
+            summary: "Waiting"
+        )
+        let fallbackThread = ThreadSnapshot(
+            id: "fallback-thread",
+            title: "Fallback thread",
+            status: .waitingForApproval,
+            freshness: Freshness(source: .appServerLive),
+            currentTurn: TurnSnapshot(
+                id: "turn-fallback",
+                phase: .waitingForApproval,
+                itemGroups: [timelineApproval],
+                blockers: []
+            ),
+            summary: "Waiting"
+        )
+
+        let blockingViewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: [thread]),
+            openAIKeyAvailable: { false }
+        )
+        let fallbackViewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: [fallbackThread]),
+            openAIKeyAvailable: { false }
+        )
+
+        XCTAssertEqual(blockingViewModel.pendingApprovalCenter?.count, 1)
+        XCTAssertEqual(blockingViewModel.pendingApprovalCenter?.items.map(\.id), ["approval-blocker"])
+        XCTAssertEqual(fallbackViewModel.pendingApprovalCenter?.items.map(\.id), ["approval-item"])
+    }
+
+    func testStageApprovalDecisionIncludesScopeAndRequiresConfirmation() {
+        let approval = TimelineItem(
+            id: "approval-item",
+            kind: .approval,
+            title: "Approve file write",
+            summary: "Allow editing Sources/UIComponents/SideCarRootView.swift",
+            source: .appServerLive
+        )
+        let thread = ThreadSnapshot(
+            id: "approval-thread",
+            title: "Approval thread",
+            status: .waitingForApproval,
+            freshness: Freshness(source: .appServerLive),
+            currentTurn: TurnSnapshot(
+                id: "turn-approval",
+                phase: .waitingForApproval,
+                itemGroups: [approval],
+                blockers: [approval]
+            ),
+            summary: "Waiting"
+        )
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: [thread]),
+            openAIKeyAvailable: { false }
+        )
+
+        viewModel.stageApprovalDecision(approved: true, itemID: approval.id)
+
+        XCTAssertEqual(viewModel.stagedAction?.kind, .approvalDecision)
+        XCTAssertEqual(viewModel.stagedAction?.targetThreadId, "approval-thread")
+        XCTAssertEqual(viewModel.stagedAction?.targetTurnId, "turn-approval")
+        XCTAssertEqual(viewModel.stagedAction?.confirmationState, .staged)
+        XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Accept") == true)
+        XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Approve file write") == true)
+        XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Allow editing Sources/UIComponents/SideCarRootView.swift") == true)
+    }
+
     nonisolated private static let threadFixtures: [ThreadSnapshot] = [
         ThreadSnapshot(
             id: "live",

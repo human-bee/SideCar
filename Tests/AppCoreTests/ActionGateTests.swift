@@ -43,3 +43,45 @@ import Testing
         try gate.validateCapability("thread/shellCommand")
     }
 }
+
+@Test func pendingApprovalCenterFallsBackFromBlockersToTimelineItems() {
+    let approval = TimelineItem(
+        id: "approval-1",
+        kind: .approval,
+        title: "Approve patch",
+        summary: "Apply SideCarRootView change",
+        source: .fixture
+    )
+    let blockerThread = ThreadSnapshot(
+        id: "thread-1",
+        title: "Blocking approval",
+        status: .waitingForApproval,
+        freshness: Freshness(source: .fixture),
+        currentTurn: TurnSnapshot(
+            id: "turn-1",
+            phase: .waitingForApproval,
+            itemGroups: [],
+            blockers: [approval]
+        ),
+        summary: "Waiting"
+    )
+    let timelineThread = ThreadSnapshot(
+        id: "thread-2",
+        title: "Timeline approval",
+        status: .waitingForApproval,
+        freshness: Freshness(source: .fixture),
+        currentTurn: TurnSnapshot(
+            id: "turn-2",
+            phase: .waitingForApproval,
+            itemGroups: [approval],
+            blockers: []
+        ),
+        summary: "Waiting"
+    )
+
+    let blockerCenter = PendingApprovalCenter(thread: blockerThread)
+    let timelineCenter = PendingApprovalCenter(thread: timelineThread)
+
+    #expect(blockerCenter?.items.map(\.id) == ["approval-1"])
+    #expect(timelineCenter?.items.map(\.id) == ["approval-1"])
+}

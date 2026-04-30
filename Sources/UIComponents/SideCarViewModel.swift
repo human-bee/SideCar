@@ -243,6 +243,10 @@ public final class SideCarViewModel: ObservableObject {
         SourceDiagnostics(activeThread: activeThread, probe: capabilityProbe)
     }
 
+    public var pendingApprovalCenter: PendingApprovalCenter? {
+        PendingApprovalCenter(thread: activeThread)
+    }
+
     public var groupedThreads: [ThreadGroup] {
         let order: [ThreadGroupKind] = [.needsAttention, .running, .idle, .completed, .stale]
         let grouped = Dictionary(grouping: threads, by: ThreadGroupKind.init(thread:))
@@ -268,6 +272,57 @@ public final class SideCarViewModel: ObservableObject {
             return "Compact this thread context."
         case .approvalDecision:
             return "Respond to the pending approval."
+        }
+    }
+
+    public func stageApprovalDecision(approved: Bool, itemID: TimelineItem.ID) {
+        guard
+            let center = pendingApprovalCenter,
+            let item = center.items.first(where: { $0.id == itemID })
+        else {
+            stagedAction = SideCarAction(
+                kind: .approvalDecision,
+                targetThreadId: activeThread.id,
+                targetTurnId: activeThread.currentTurn?.id,
+                payloadPreview: "Could not stage action: approval item is no longer available.",
+                actor: .system,
+                source: activeThread.freshness.source,
+                confirmationState: .failed
+            )
+            return
+        }
+
+        let decision = approved ? "Accept" : "Decline"
+        let summaryLines = [
+            "\(decision) approval decision",
+            "thread: \(center.scope.threadId)",
+            "turn: \(center.scope.turnId)",
+            "title: \(item.title)",
+            "summary: \(item.summary)"
+        ]
+        let action = SideCarAction(
+            kind: .approvalDecision,
+            targetThreadId: center.scope.threadId,
+            targetTurnId: center.scope.turnId,
+            payloadPreview: summaryLines.joined(separator: "\n"),
+            actor: .userClick,
+            source: activeThread.freshness.source,
+            confirmationState: .staged
+        )
+
+        do {
+            try actionGate.validateForStaging(action, activeThread: activeThread)
+            stagedAction = action
+        } catch {
+            stagedAction = SideCarAction(
+                kind: .approvalDecision,
+                targetThreadId: center.scope.threadId,
+                targetTurnId: center.scope.turnId,
+                payloadPreview: "Could not stage action: \(error)",
+                actor: .system,
+                source: activeThread.freshness.source,
+                confirmationState: .failed
+            )
         }
     }
 }
