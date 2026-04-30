@@ -366,8 +366,14 @@ private struct StagedActionCard: View {
             HStack {
                 Button("Dismiss", action: onDismiss)
                 Spacer()
-                Button("Confirm", action: onConfirm)
-                    .keyboardShortcut(.defaultAction)
+                if action.kind == .approvalDecision {
+                    Text("Draft only")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CodexTheme.secondaryText)
+                } else {
+                    Button("Confirm", action: onConfirm)
+                        .keyboardShortcut(.defaultAction)
+                }
             }
         }
         .padding(12)

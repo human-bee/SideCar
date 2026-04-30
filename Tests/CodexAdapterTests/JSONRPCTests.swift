@@ -517,12 +517,35 @@ import Testing
     #expect(transport.stopCount == 1)
 }
 
+@Test func executeLiveActionDoesNotRetryMutationAfterProxyCallFailure() throws {
+    let transport = MockCodexTransport()
+    transport.results = ["initialize": .object(["ok": .bool(true)])]
+    transport.callErrors = ["turn/start": CodexAppServerError.malformedResponse]
+    let client = CodexAppServerClient(transport: transport)
+    let action = SideCarAction(
+        kind: .queueMessage,
+        targetThreadId: "thread-1",
+        payloadPreview: "do not replay",
+        actor: .userClick,
+        source: .appServerLive,
+        confirmationState: .confirmed
+    )
+
+    #expect(throws: CodexAppServerError.self) {
+        _ = try client.executeLiveAction(action)
+    }
+    #expect(transport.startedModes == [.proxy])
+    #expect(transport.calls.map(\.method) == ["initialize", "turn/start"])
+    #expect(transport.stopCount == 1)
+}
+
 private final class MockCodexTransport: CodexAppServerTransport {
     var startedModes: [CodexAppServerLaunchMode] = []
     var stopCount = 0
     var calls: [(method: String, params: JSONValue?)] = []
     var notifications: [(method: String, params: JSONValue?)] = []
     var results: [String: JSONValue] = [:]
+    var callErrors: [String: Error] = [:]
 
     func start(mode: CodexAppServerLaunchMode) throws {
         startedModes.append(mode)
@@ -534,6 +557,9 @@ private final class MockCodexTransport: CodexAppServerTransport {
 
     func call(method: String, params: JSONValue?) throws -> JSONValue? {
         calls.append((method, params))
+        if let error = callErrors[method] {
+            throw error
+        }
         return results[method]
     }
 

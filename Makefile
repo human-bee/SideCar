@@ -1,4 +1,4 @@
-.PHONY: test build run realtime-smoke
+.PHONY: test build run app realtime-smoke
 
 test:
 	swift test
@@ -8,6 +8,9 @@ build:
 
 run:
 	swift run SideCar
+
+app:
+	scripts/build-debug-app.sh
 
 realtime-smoke:
 	scripts/realtime-smoke.sh

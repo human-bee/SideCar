@@ -94,6 +94,40 @@ final class SideCarViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.capabilityProbe.notes.contains("Live app-server reload timed out; staying in fixture mode."))
     }
 
+    func testOverlappingReloadsKeepLatestResult() async {
+        let sequence = ReloadSequence()
+        let oldThread = ThreadSnapshot(
+            id: "old-live",
+            title: "Old live",
+            status: .running,
+            freshness: Freshness(source: .appServerLive),
+            summary: "Older response"
+        )
+        let newThread = ThreadSnapshot(
+            id: "new-live",
+            title: "New live",
+            status: .running,
+            freshness: Freshness(source: .appServerLive),
+            summary: "Newer response"
+        )
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            openAIKeyAvailable: { false }
+        )
+        viewModel.liveReloadTimeoutNanoseconds = 500_000_000
+        viewModel.liveReload = {
+            await sequence.next(oldThread: oldThread, newThread: newThread)
+        }
+
+        viewModel.reloadFromBestAvailableSource()
+        try? await Task.sleep(nanoseconds: 5_000_000)
+        viewModel.reloadFromBestAvailableSource()
+
+        try? await Task.sleep(nanoseconds: 130_000_000)
+        XCTAssertEqual(viewModel.activeThread.id, "new-live")
+        XCTAssertEqual(viewModel.capabilityProbe.transport, "latest")
+    }
+
     func testPendingApprovalsPreferBlockersAndFallbackToTimelineItems() {
         let blockingApproval = TimelineItem(
             id: "approval-blocker",
@@ -183,8 +217,50 @@ final class SideCarViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.stagedAction?.targetTurnId, "turn-approval")
         XCTAssertEqual(viewModel.stagedAction?.confirmationState, .staged)
         XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Accept") == true)
+        XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("approval item: approval-item") == true)
         XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Approve file write") == true)
         XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Allow editing Sources/UIComponents/SideCarRootView.swift") == true)
+    }
+
+    func testConfirmApprovalDecisionDoesNotUseLiveExecutor() async {
+        let executedAction = ActionRecorder()
+        let approval = TimelineItem(
+            id: "approval-item",
+            kind: .approval,
+            title: "Approve command",
+            summary: "Run tool",
+            source: .appServerLive
+        )
+        let thread = ThreadSnapshot(
+            id: "approval-thread",
+            title: "Approval thread",
+            status: .waitingForApproval,
+            freshness: Freshness(source: .appServerLive),
+            currentTurn: TurnSnapshot(
+                id: "turn-approval",
+                phase: .waitingForApproval,
+                itemGroups: [approval],
+                blockers: [approval]
+            ),
+            summary: "Waiting"
+        )
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: [thread]),
+            openAIKeyAvailable: { false }
+        )
+        viewModel.liveActionExecutor = { action in
+            await executedAction.record(action)
+            return "should not send"
+        }
+
+        viewModel.stageApprovalDecision(approved: false, itemID: approval.id)
+        viewModel.confirmStagedAction()
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        let recordedAction = await executedAction.currentAction()
+        XCTAssertNil(recordedAction)
+        XCTAssertEqual(viewModel.stagedAction?.confirmationState, .failed)
+        XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("server-request response plumbing") == true)
     }
 
     nonisolated private static let threadFixtures: [ThreadSnapshot] = [
@@ -228,6 +304,19 @@ private actor ActionRecorder {
 
     func currentAction() -> SideCarAction? {
         action
+    }
+}
+
+private actor ReloadSequence {
+    private var count = 0
+
+    func next(oldThread: ThreadSnapshot, newThread: ThreadSnapshot) async -> ([ThreadSnapshot], CapabilityProbe) {
+        count += 1
+        if count == 1 {
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            return ([oldThread], CapabilityProbe(appServerAvailable: true, transport: "older"))
+        }
+        return ([newThread], CapabilityProbe(appServerAvailable: true, transport: "latest"))
     }
 }
 

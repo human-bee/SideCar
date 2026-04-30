@@ -385,17 +385,24 @@ public struct CodexAppServerClient {
     }
 
     private func withInitializedSession<T>(_ body: () throws -> T) throws -> T {
+        try startInitializedTransport()
+        defer { transport.stop() }
+        return try body()
+    }
+
+    private func startInitializedTransport() throws {
         do {
             try startTransport(mode: .proxy)
             _ = try initialize()
-            defer { transport.stop() }
-            return try body()
         } catch {
             transport.stop()
             try startTransport(mode: .stdio)
-            _ = try initialize()
-            defer { transport.stop() }
-            return try body()
+            do {
+                _ = try initialize()
+            } catch {
+                transport.stop()
+                throw error
+            }
         }
     }
 

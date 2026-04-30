@@ -15,6 +15,15 @@ swift run SideCar
 
 The floating panel opens with fixture data. This mode does not require Codex Desktop, Codex++, Screen Recording, or an OpenAI key.
 
+## Build A Local Debug App
+
+```bash
+make app
+open -n dist/SideCar.app
+```
+
+This creates an unsigned local review bundle at `dist/SideCar.app`. It is useful for smoke testing app lifecycle behavior through LaunchServices. It is not a notarized release artifact.
+
 ## Live Codex Probe
 
 On launch, SideCar tries to probe the bundled Codex app binary at:
@@ -23,7 +32,11 @@ On launch, SideCar tries to probe the bundled Codex app binary at:
 /Applications/Codex.app/Contents/Resources/codex
 ```
 
-SideCar currently tries the app-server proxy first, then falls back to direct `stdio://` app-server. Live mode performs initialize, `thread/list`, and `thread/read` for recent thread snapshots. Continuous event streaming is the next integration milestone.
+SideCar currently tries the app-server proxy first, then falls back to direct `stdio://` app-server. Live mode performs initialize and bounded `thread/list` loading for recent thread snapshots. The notification pump can parse app-server event frames during request/response traffic; an independent long-lived stream reader is the next integration milestone.
+
+Confirmed live actions are not retried after a post-request failure. This avoids replaying side effects such as `turn/start`, `turn/steer`, or `thread/fork` if the proxy path sent the request but response parsing failed.
+
+Approval cards are draft-only in this build. The app-server approval flow is server-initiated JSON-RPC request/response, so accept/decline execution needs request-id response plumbing before it can be enabled safely.
 
 ## OpenAI Key
 

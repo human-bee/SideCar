@@ -7,13 +7,15 @@ SideCar is a native macOS companion app for Codex Desktop. The architecture is i
 - `SideCarApp`: AppKit process shell, menu bar item, floating panel.
 - `UIComponents`: SwiftUI surface for status, timeline map, thread switchboard, talk dock, and confirmation cards.
 - `AppCore`: SideCar-owned contracts and action gates.
-- `CodexAdapter`: Codex app-server JSON-RPC client, optional Codex++ active-thread bridge, read-only sqlite/rollout fallbacks.
+- `CodexAdapter`: Codex app-server JSON-RPC client, notification parser/pump, optional Codex++ active-thread bridge, read-only sqlite/rollout fallbacks.
 - `ThreadStore`: fixture, cache, and search layer.
 - `VoiceCore`: Realtime token broker, voice tool policy, and screen-context consent helpers.
 
 ## Source Of Truth
 
 Live mode should use Codex app-server as the authoritative source for thread status, turn lifecycle, item events, and safe thread controls.
+
+Current MVP live loading is intentionally bounded: startup uses recent `thread/list` snapshots to avoid blocking launch on very large thread reads. The notification pump parses app-server event frames during request/response traffic; a dedicated long-lived reader is the next integration step.
 
 Active-thread resolution order:
 
@@ -34,9 +36,11 @@ MVP actions are limited to safe thread-level controls:
 - interrupt turn
 - start review
 - compact thread
-- approval decision
+- approval decision staging
 
 Every mutation is staged as a `SideCarAction` and must pass `ActionGate` before execution. The target card must show thread id, turn id when relevant, action kind, and payload preview.
+
+Approval cards are currently inspection/staging only. Codex app-server approvals are server-initiated JSON-RPC requests, so executing accept/decline requires preserving the request id and writing a JSON-RPC response on the same connection. SideCar intentionally does not fake that as a normal client method call.
 
 Explicitly excluded from MVP:
 

@@ -12,13 +12,14 @@ This repository is a two-hour MVP scaffold, not a finished Codex automation prod
 - Safe action-gating contracts for queued messages, steer, fork, interrupt, review, compact, and approvals.
 - Live Codex app-server snapshot loading through initialize, `thread/list`, and `thread/read`.
 - Confirmed safe actions can be sent to the live Codex app-server for the MVP-supported methods.
+- Approval cards are visible and scoped, but remain draft-only until SideCar can answer app-server server-initiated approval requests by request id.
 - Documentation for architecture, privacy, compatibility, and design direction.
 
-Current limitations are intentional: continuous app-server event streaming, packaged distribution, full voice audio loop wiring, and production-grade ScreenCaptureKit UX are roadmap items.
+Current limitations are intentional: approval request-response execution, independent long-lived app-server streaming, signed/notarized distribution, full voice audio loop wiring, and production-grade ScreenCaptureKit UX are roadmap items.
 
 ## Roadmap
 
-1. Add continuous app-server event streaming for `item/*`, `turn/*`, and approval requests.
+1. Promote the app-server notification pump into an independent long-lived stream reader for `item/*`, `turn/*`, and approval requests.
 2. Promote fixture snapshots into sanitized regression fixtures.
 3. Add signed/notarized macOS packaging.
 4. Expand visual context consent UX before enabling richer screen-aware features.
@@ -47,6 +48,15 @@ swift run SideCar
 ```
 
 The app opens as a menu bar accessory with a floating SideCar panel. It tries live Codex app-server loading first and falls back to fixture mode if Codex is unavailable.
+
+Build and open a local debug `.app` bundle:
+
+```bash
+make app
+open -n dist/SideCar.app
+```
+
+The debug bundle is unsigned and intended for local review only. Release builds still need signing and notarization.
 
 ## OpenAI API Key
 

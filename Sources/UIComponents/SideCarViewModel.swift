@@ -31,6 +31,7 @@ public final class SideCarViewModel: ObservableObject {
     private let realtimeTokenBroker: RealtimeTokenBroker
     private let saveOpenAIKey: (String) throws -> Void
     private let openAIKeyAvailable: () -> Bool
+    private var reloadGeneration = 0
 
     public init(
         repository: ThreadRepository = FixtureThreadRepository(),
@@ -86,9 +87,12 @@ public final class SideCarViewModel: ObservableObject {
             refreshFixtures()
             return
         }
+        reloadGeneration += 1
+        let generation = reloadGeneration
         isReloading = true
         Task {
             let (snapshots, probe) = await boundedLiveReload(liveReload)
+            guard generation == reloadGeneration else { return }
             applySnapshots(snapshots)
             updateCapabilityProbe(probe)
             isReloading = false
@@ -176,6 +180,12 @@ public final class SideCarViewModel: ObservableObject {
 
     public func confirmStagedAction() {
         guard var action = stagedAction else { return }
+        if action.kind == .approvalDecision {
+            action.confirmationState = .failed
+            action.payloadPreview += "\n\nApproval execution is not sent yet. Codex app-server approvals are server-initiated JSON-RPC requests and require request-id response plumbing before SideCar can safely accept or decline them."
+            stagedAction = action
+            return
+        }
         action.confirmationState = .confirmed
         do {
             try actionGate.validateForExecution(action, activeThread: activeThread)
@@ -297,8 +307,10 @@ public final class SideCarViewModel: ObservableObject {
             "\(decision) approval decision",
             "thread: \(center.scope.threadId)",
             "turn: \(center.scope.turnId)",
+            "approval item: \(item.id)",
             "title: \(item.title)",
-            "summary: \(item.summary)"
+            "summary: \(item.summary)",
+            "status: staged only until app-server server-request response plumbing is implemented"
         ]
         let action = SideCarAction(
             kind: .approvalDecision,
