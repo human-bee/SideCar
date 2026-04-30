@@ -539,6 +539,12 @@ private struct TalkDock: View {
                 Toggle("speech-to-speech", isOn: $viewModel.speechToSpeechEnabled)
                     .font(.system(size: 12))
                 Spacer()
+                Button("Check Realtime") {
+                    Task {
+                        await viewModel.checkRealtimeReadiness()
+                    }
+                }
+                .font(.system(size: 12))
                 Button("Request Screen Access") {
                     viewModel.requestScreenCapturePermission()
                 }
@@ -547,6 +553,72 @@ private struct TalkDock: View {
                     .font(.system(size: 11))
                     .foregroundStyle(CodexTheme.secondaryText)
             }
+            Label(viewModel.realtimeReadiness.diagnostic, systemImage: realtimeStatusIcon)
+                .font(.system(size: 11))
+                .foregroundStyle(realtimeStatusColor)
+            Text("Preview controls stage screen context only. Live speech-to-speech streaming is not implemented in this slice.")
+                .font(.system(size: 11))
+                .foregroundStyle(CodexTheme.secondaryText)
+            HStack {
+                Button("Capture Preview") {
+                    do {
+                        try viewModel.capturePreview()
+                    } catch {
+                        viewModel.clearPreview()
+                    }
+                }
+                .font(.system(size: 12))
+                Button("Accept Preview") {
+                    viewModel.acceptPreview()
+                }
+                .font(.system(size: 12))
+                .disabled(viewModel.previewBundle == nil)
+                Button("Clear Preview") {
+                    viewModel.clearPreview()
+                }
+                .font(.system(size: 12))
+                .disabled(viewModel.previewBundle == nil)
+            }
+            if let preview = viewModel.previewBundle {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Preview: \(preview.displayName)")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("File: \(preview.imagePath.flatMap { URL(fileURLWithPath: $0).lastPathComponent } ?? "none")")
+                        .font(.system(size: 11))
+                        .foregroundStyle(CodexTheme.secondaryText)
+                    Text("Accepted: \(preview.previewAccepted ? "yes" : "no") · Sent: \(preview.sentToModel ? "yes" : "no")")
+                        .font(.system(size: 11))
+                        .foregroundStyle(CodexTheme.secondaryText)
+                }
+            } else {
+                Text("No preview captured.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(CodexTheme.secondaryText)
+            }
+        }
+    }
+
+    private var realtimeStatusIcon: String {
+        switch viewModel.realtimeReadiness.state {
+        case .missingKey:
+            return "key.slash"
+        case .ready:
+            return "checkmark.circle"
+        case .active:
+            return "waveform.badge.mic"
+        case .failed:
+            return "xmark.octagon"
+        }
+    }
+
+    private var realtimeStatusColor: Color {
+        switch viewModel.realtimeReadiness.state {
+        case .missingKey:
+            return CodexTheme.secondaryText
+        case .ready, .active:
+            return CodexTheme.statusGreen
+        case .failed:
+            return .red
         }
     }
 }

@@ -55,6 +55,11 @@ public enum RealtimeSessionStatus: Equatable, Sendable {
     case failed(model: String?, message: String)
 }
 
+public protocol RealtimeStatusClient: Sendable {
+    func currentRealtimeStatus(model: String) -> RealtimeSessionStatus
+    func checkRealtimeStatus(model: String) async -> RealtimeSessionStatus
+}
+
 public enum RealtimeTokenBrokerError: Error, CustomStringConvertible {
     case missingAPIKey
     case invalidResponse(Int, String)
@@ -165,7 +170,7 @@ public struct URLSessionRealtimeSessionTransport: RealtimeSessionTransport {
     }
 }
 
-public final class RealtimeTokenBroker {
+public final class RealtimeTokenBroker: RealtimeStatusClient {
     public static let defaultRealtimeModel = "gpt-realtime-1.5"
     public static let defaultTextModel = "gpt-5.3-spark"
 
@@ -196,6 +201,10 @@ public final class RealtimeTokenBroker {
         apiKeyAvailable() ? .ready(model: model) : .missingAPIKey
     }
 
+    public func currentRealtimeStatus(model: String) -> RealtimeSessionStatus {
+        sessionStatus(model: model)
+    }
+
     public func mintRealtimeSession(model: String = RealtimeTokenBroker.defaultRealtimeModel) async throws -> RealtimeSessionToken {
         guard let apiKey = try apiKeySource.apiKey() else {
             throw RealtimeTokenBrokerError.missingAPIKey
@@ -217,5 +226,9 @@ public final class RealtimeTokenBroker {
         } catch {
             return .failed(model: model, message: String(describing: error))
         }
+    }
+
+    public func checkRealtimeStatus(model: String) async -> RealtimeSessionStatus {
+        await mintRealtimeSessionStatus(model: model)
     }
 }

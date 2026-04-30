@@ -5,6 +5,23 @@ import VoiceCore
 
 private typealias ReloadResult = ([ThreadSnapshot], CapabilityProbe)
 
+public enum RealtimeReadinessState: Equatable {
+    case missingKey
+    case ready
+    case active
+    case failed
+}
+
+public struct RealtimeReadiness: Equatable {
+    public var state: RealtimeReadinessState
+    public var diagnostic: String
+
+    public init(state: RealtimeReadinessState, diagnostic: String) {
+        self.state = state
+        self.diagnostic = diagnostic
+    }
+}
+
 @MainActor
 public final class SideCarViewModel: ObservableObject {
     @Published public private(set) var activeThread: ThreadSnapshot
@@ -20,6 +37,8 @@ public final class SideCarViewModel: ObservableObject {
     @Published public var openAIKeyDraft = ""
     @Published public private(set) var openAIKeyStatus: SettingsStatus
     @Published public private(set) var selectedThreadId: ThreadSnapshot.ID?
+    @Published public private(set) var realtimeReadiness: RealtimeReadiness
+    @Published public private(set) var previewBundle: VisualContextBundle?
 
     public var liveReload: (@Sendable () async -> ([ThreadSnapshot], CapabilityProbe))?
     public var liveActionExecutor: (@Sendable (SideCarAction) async throws -> String?)?
@@ -27,8 +46,8 @@ public final class SideCarViewModel: ObservableObject {
 
     private let repository: ThreadRepository
     private let actionGate = ActionGate()
-    private let screenContext = ScreenContextCoordinator()
-    private let realtimeTokenBroker: RealtimeTokenBroker
+    private let screenPreviewCoordinator: ScreenPreviewCoordinating
+    private let realtimeStatusClient: RealtimeStatusClient
     private let saveOpenAIKey: (String) throws -> Void
     private let openAIKeyAvailable: () -> Bool
     private var reloadGeneration = 0
@@ -36,6 +55,8 @@ public final class SideCarViewModel: ObservableObject {
     public init(
         repository: ThreadRepository = FixtureThreadRepository(),
         realtimeTokenBroker: RealtimeTokenBroker = RealtimeTokenBroker(),
+        realtimeStatusClient: RealtimeStatusClient? = nil,
+        screenPreviewCoordinator: ScreenPreviewCoordinating = ScreenContextCoordinator(),
         saveOpenAIKey: ((String) throws -> Void)? = nil,
         openAIKeyAvailable: (() -> Bool)? = nil
     ) {
@@ -45,10 +66,13 @@ public final class SideCarViewModel: ObservableObject {
             realtimeTokenBroker.apiKeyAvailable()
         }
         let initialKeyStatus: SettingsStatus = keyAvailable() ? .saved("OpenAI key available") : .needsAttention("OpenAI key not configured")
-        let initialScreenPermission = ScreenContextCoordinator().permissionState()
+        let initialScreenPermission = screenPreviewCoordinator.permissionState()
+        let realtimeClient = realtimeStatusClient ?? realtimeTokenBroker
+        let initialRealtimeReadiness = Self.readiness(from: realtimeClient.currentRealtimeStatus(model: RealtimeTokenBroker.defaultRealtimeModel))
 
         self.repository = repository
-        self.realtimeTokenBroker = realtimeTokenBroker
+        self.realtimeStatusClient = realtimeClient
+        self.screenPreviewCoordinator = screenPreviewCoordinator
         self.saveOpenAIKey = saveOpenAIKey ?? { key in
             try realtimeTokenBroker.saveAPIKey(key)
         }
@@ -58,12 +82,13 @@ public final class SideCarViewModel: ObservableObject {
         self.screenPermission = initialScreenPermission
         self.selectedThreadId = initialActiveThread.id
         self.openAIKeyStatus = initialKeyStatus
+        self.realtimeReadiness = initialRealtimeReadiness
     }
 
     public func refreshFixtures() {
         activeThread = repository.activeThread()
         threads = repository.allThreads()
-        screenPermission = screenContext.permissionState()
+        screenPermission = screenPreviewCoordinator.permissionState()
         selectedThreadId = activeThread.id
     }
 
@@ -224,8 +249,25 @@ public final class SideCarViewModel: ObservableObject {
     }
 
     public func requestScreenCapturePermission() {
-        _ = screenContext.requestPermission()
-        screenPermission = screenContext.permissionState()
+        _ = screenPreviewCoordinator.requestPermission()
+        screenPermission = screenPreviewCoordinator.permissionState()
+    }
+
+    public func checkRealtimeReadiness() async {
+        realtimeReadiness = Self.readiness(from: await realtimeStatusClient.checkRealtimeStatus(model: RealtimeTokenBroker.defaultRealtimeModel))
+    }
+
+    public func capturePreview(displayName: String = "Main display") throws {
+        previewBundle = try screenPreviewCoordinator.capturePreviewBundle(displayName: displayName)
+    }
+
+    public func acceptPreview() {
+        guard let previewBundle else { return }
+        self.previewBundle = screenPreviewCoordinator.markPreviewAccepted(previewBundle)
+    }
+
+    public func clearPreview() {
+        previewBundle = nil
     }
 
     public func selectThread(_ id: ThreadSnapshot.ID) {
@@ -335,6 +377,21 @@ public final class SideCarViewModel: ObservableObject {
                 source: activeThread.freshness.source,
                 confirmationState: .failed
             )
+        }
+    }
+
+    private static func readiness(from status: RealtimeSessionStatus) -> RealtimeReadiness {
+        switch status {
+        case .missingAPIKey:
+            return RealtimeReadiness(state: .missingKey, diagnostic: "OpenAI API key missing")
+        case .ready(let model):
+            return RealtimeReadiness(state: .ready, diagnostic: "Realtime \(model) ready")
+        case .minting(let model):
+            return RealtimeReadiness(state: .ready, diagnostic: "Realtime \(model) check in progress")
+        case .active(let model, _):
+            return RealtimeReadiness(state: .active, diagnostic: "Realtime \(model) active")
+        case .failed(_, let message):
+            return RealtimeReadiness(state: .failed, diagnostic: message)
         }
     }
 }
