@@ -236,7 +236,7 @@ final class SideCarViewModelTests: XCTestCase {
 
         viewModel.reloadFromBestAvailableSource()
 
-        try? await Task.sleep(nanoseconds: 80_000_000)
+        await waitUntilReloadFinishes(viewModel)
         XCTAssertFalse(viewModel.isReloading)
         XCTAssertEqual(viewModel.activeThread.id, SampleData.activeThread.id)
         XCTAssertEqual(viewModel.capabilityProbe.transport, "fixture")
@@ -541,5 +541,15 @@ private final class StubThreadRepository: ThreadRepository {
 
     func search(_ query: String) -> [ThreadSnapshot] {
         threads
+    }
+}
+
+@MainActor
+private func waitUntilReloadFinishes(_ viewModel: SideCarViewModel) async {
+    for _ in 0..<100 {
+        if !viewModel.isReloading {
+            return
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
     }
 }
