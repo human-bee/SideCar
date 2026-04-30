@@ -223,6 +223,41 @@ final class SideCarViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.stagedAction?.payloadPreview.contains("Sent to live Codex app-server.") == true)
     }
 
+    func testStageSideQuestionUsesDraftWithoutTargetingActiveTurn() {
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            openAIKeyAvailable: { false }
+        )
+
+        viewModel.chatDraft = "  What does /side buy us here?  "
+        viewModel.stageSideQuestion()
+
+        XCTAssertEqual(viewModel.stagedAction?.kind, .sideQuestion)
+        XCTAssertEqual(viewModel.stagedAction?.targetThreadId, "live")
+        XCTAssertNil(viewModel.stagedAction?.targetTurnId)
+        XCTAssertEqual(viewModel.stagedAction?.payloadPreview, "What does /side buy us here?")
+        XCTAssertEqual(viewModel.stagedAction?.confirmationState, .staged)
+        XCTAssertEqual(viewModel.chatDraft, "")
+    }
+
+    func testStartRealtimeVoiceSessionSelectsTalkAndChecksReadiness() async {
+        let client = StubRealtimeStatusClient(
+            currentStatus: .missingAPIKey,
+            checkedStatus: .ready(model: "gpt-realtime-1.5")
+        )
+        let viewModel = SideCarViewModel(
+            repository: StubThreadRepository(threads: Self.threadFixtures),
+            realtimeStatusClient: client,
+            openAIKeyAvailable: { true }
+        )
+
+        await viewModel.startRealtimeVoiceSession()
+
+        XCTAssertEqual(viewModel.selectedBottomTab, .talk)
+        XCTAssertEqual(client.checkCallCount, 1)
+        XCTAssertEqual(viewModel.realtimeReadiness.state, .ready)
+    }
+
     func testReloadTimeoutKeepsFixtureDataWhenLiveSourceHangs() async {
         let viewModel = SideCarViewModel(
             repository: StubThreadRepository(threads: Self.threadFixtures),

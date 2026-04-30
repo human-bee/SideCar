@@ -197,6 +197,7 @@ public struct PendingApprovalCenter: Equatable, Sendable {
 
 public enum SideCarActionKind: String, Codable, Sendable, CaseIterable {
     case queueMessage
+    case sideQuestion
     case steerTurn
     case forkThread
     case interruptTurn

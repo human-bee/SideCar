@@ -36,6 +36,8 @@ SideCar currently tries the app-server proxy first, then falls back to direct `s
 
 Confirmed live actions are not retried after a post-request failure. This avoids replaying side effects such as `turn/start`, `turn/steer`, or `thread/fork` if the proxy path sent the request but response parsing failed.
 
+`/side` is a first-class SideCar primitive. In this build, live execution maps it to a guarded `thread/fork` with `persistExtendedHistory: false` and developer instructions that treat the parent history as read-only reference context. Replace that adapter method when Codex app-server exposes a dedicated `/side` request.
+
 Approval cards are draft-only in this build. The app-server approval flow is server-initiated JSON-RPC request/response. SideCar can decode command/file approval requests and encode accept/decline responses with the same request id, but live execution still needs same-connection response plumbing before it can be enabled safely.
 
 ## OpenAI Key
@@ -72,4 +74,4 @@ rm -f "$tmp"
 
 ## Screen Capture
 
-The Talk dock includes Realtime readiness checks, a Screen Recording permission request, capture preview, accept preview, and clear preview controls. Captured visual context remains preview-gated and is not automatically sent to a model.
+The Talk dock includes Realtime readiness checks, a Screen Recording permission request, capture preview, accept preview, and clear preview controls. Option-Shift-Space opens Talk mode and checks Realtime readiness. Captured visual context remains preview-gated and is not automatically sent to a model.

@@ -16,6 +16,16 @@ import VoiceCore
     #expect(policy.requiresConfirmation(.stageFork) == true)
     #expect(policy.requiresConfirmation(.stageInterrupt) == true)
     #expect(policy.requiresConfirmation(.stageReview) == true)
+    #expect(policy.requiresConfirmation(.stageSideQuestion) == true)
+}
+
+@Test func voiceToolsMapToSideCarActionKinds() throws {
+    let policy = VoiceToolPolicy()
+    #expect(policy.actionKind(for: .draftQueueMessage) == .queueMessage)
+    #expect(policy.actionKind(for: .draftSteer) == .steerTurn)
+    #expect(policy.actionKind(for: .stageFork) == .forkThread)
+    #expect(policy.actionKind(for: .stageSideQuestion) == .sideQuestion)
+    #expect(policy.actionKind(for: .getActiveThread) == nil)
 }
 
 @Test func screenContextBundlesStartUnsentAndUnaccepted() throws {

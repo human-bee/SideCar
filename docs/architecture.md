@@ -31,6 +31,7 @@ Fallbacks can show history and stale status. They cannot execute actions.
 MVP actions are limited to safe thread-level controls:
 
 - queue message
+- `/side` tangent question
 - steer active turn
 - fork thread
 - interrupt turn
@@ -39,6 +40,8 @@ MVP actions are limited to safe thread-level controls:
 - approval decision staging
 
 Every mutation is staged as a `SideCarAction` and must pass `ActionGate` before execution. The target card must show thread id, turn id when relevant, action kind, and payload preview.
+
+The `/side` primitive is modeled as `SideCarActionKind.sideQuestion`. Until Codex app-server exposes a dedicated side-conversation method, the live adapter maps it to `thread/fork` with `persistExtendedHistory: false` and developer instructions that treat the parent thread as read-only reference context. This keeps `/side` distinct from both queue and steer in SideCar's product model while preserving a safe fallback transport.
 
 Approval cards are currently inspection/staging only. Codex app-server approvals are server-initiated JSON-RPC requests. SideCar now models command/file approval requests, preserves the server request id on normalized approval timeline items, and encodes approval JSON-RPC responses. Live accept/decline remains disabled until those responses are written on the same active app-server connection. SideCar intentionally does not fake approvals as normal client method calls.
 
@@ -54,7 +57,7 @@ Explicitly excluded from MVP:
 
 ## Realtime Voice
 
-Voice is speech-to-action by default. The app mints ephemeral Realtime sessions through a native broker using a BYO OpenAI key from Keychain. Talk mode can check Realtime readiness and show redacted session diagnostics. Voice tools may inspect and draft freely, but all mutations stage an action card and require confirmation. Full live audio streaming remains future work.
+Voice is speech-to-action by default. The app mints ephemeral Realtime sessions through a native broker using a BYO OpenAI key from Keychain. Talk mode can check Realtime readiness and show redacted session diagnostics. Option-Shift-Space opens Talk mode and runs that readiness check. Voice tools may inspect and draft freely, but all mutations stage an action card and require confirmation. Full live audio streaming remains future work.
 
 ## Screen Awareness
 

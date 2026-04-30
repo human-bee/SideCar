@@ -557,6 +557,34 @@ import Testing
     ]))
 }
 
+@Test func liveActionRequestBuildsSideQuestionAsGuardedSideFork() throws {
+    let action = SideCarAction(
+        kind: .sideQuestion,
+        targetThreadId: "thread-1",
+        payloadPreview: "What is the fastest way to validate the current crash?",
+        actor: .userClick,
+        source: .appServerLive,
+        confirmationState: .confirmed
+    )
+
+    let request = try CodexLiveActionRequest.build(from: action)
+
+    #expect(request.method == "thread/fork")
+    #expect(request.params == .object([
+        "threadId": .string("thread-1"),
+        "persistExtendedHistory": .bool(false),
+        "developerInstructions": .string("""
+        Side conversation requested through the SideCar /side primitive.
+        Treat the parent thread history as read-only reference context.
+        Answer the tangent without steering the parent turn.
+        Do not mutate files, run commands, install plugins, or create worktrees unless the user explicitly asks inside this side conversation.
+
+        User side question:
+        What is the fastest way to validate the current crash?
+        """)
+    ]))
+}
+
 @Test func liveActionRequestBuildsInterruptForkCompactAndReview() throws {
     #expect(CodexLiveActionRequest.interruptTurn(threadId: "thread-1", turnId: "turn-1") == CodexLiveActionRequest(
         method: "turn/interrupt",

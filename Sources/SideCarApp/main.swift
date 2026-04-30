@@ -23,7 +23,8 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var panel: NSPanel?
     private var settingsPanel: NSPanel?
-    private var hotKeyMonitor: Any?
+    private var localHotKeyMonitor: Any?
+    private var globalHotKeyMonitor: Any?
     private let viewModel = SideCarViewModel()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -61,6 +62,9 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
         let showItem = NSMenuItem(title: "Show SideCar", action: #selector(showPanelAction), keyEquivalent: " ")
         showItem.keyEquivalentModifierMask = [.option]
         menu.addItem(showItem)
+        let talkItem = NSMenuItem(title: "Start Realtime Voice", action: #selector(startRealtimeVoiceAction), keyEquivalent: " ")
+        talkItem.keyEquivalentModifierMask = [.option, .shift]
+        menu.addItem(talkItem)
         menu.addItem(NSMenuItem(title: "Settings...", action: #selector(showSettingsAction), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
@@ -69,14 +73,48 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureHotKeyScaffold() {
-        hotKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .option,
-                  event.charactersIgnoringModifiers == " " else {
-                return event
-            }
-            self?.togglePanel()
-            return nil
+        localHotKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleLocalHotKey(event) ?? event
         }
+        globalHotKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleGlobalHotKey(event)
+        }
+    }
+
+    private func handleLocalHotKey(_ event: NSEvent) -> NSEvent? {
+        switch hotKeyIntent(for: event) {
+        case .togglePanel:
+            togglePanel()
+            return nil
+        case .startRealtimeVoice:
+            startRealtimeVoice()
+            return nil
+        case .none:
+            return event
+        }
+    }
+
+    private func handleGlobalHotKey(_ event: NSEvent) {
+        switch hotKeyIntent(for: event) {
+        case .togglePanel:
+            togglePanel()
+        case .startRealtimeVoice:
+            startRealtimeVoice()
+        case .none:
+            break
+        }
+    }
+
+    private func hotKeyIntent(for event: NSEvent) -> HotKeyIntent? {
+        guard event.charactersIgnoringModifiers == " " else { return nil }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags == [.option, .shift] {
+            return .startRealtimeVoice
+        }
+        if flags == .option {
+            return .togglePanel
+        }
+        return nil
     }
 
     private func makePanel() -> NSPanel {
@@ -131,6 +169,17 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
         showSettings()
     }
 
+    @objc private func startRealtimeVoiceAction() {
+        startRealtimeVoice()
+    }
+
+    private func startRealtimeVoice() {
+        showPanel()
+        Task {
+            await viewModel.startRealtimeVoiceSession()
+        }
+    }
+
     private func showPanel() {
         if panel == nil {
             panel = makePanel()
@@ -163,9 +212,17 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
-        if let hotKeyMonitor {
-            NSEvent.removeMonitor(hotKeyMonitor)
+        if let localHotKeyMonitor {
+            NSEvent.removeMonitor(localHotKeyMonitor)
+        }
+        if let globalHotKeyMonitor {
+            NSEvent.removeMonitor(globalHotKeyMonitor)
         }
         NSApp.terminate(nil)
     }
+}
+
+private enum HotKeyIntent {
+    case togglePanel
+    case startRealtimeVoice
 }

@@ -6,6 +6,7 @@ public enum VoiceTool: String, CaseIterable, Sendable {
     case summarizeThread
     case listRunningThreads
     case draftQueueMessage
+    case stageSideQuestion
     case draftSteer
     case stageFork
     case stageInterrupt
@@ -20,7 +21,7 @@ public struct VoiceToolPolicy: Sendable {
         switch tool {
         case .getActiveThread, .summarizeThread, .listRunningThreads:
             return false
-        case .draftQueueMessage, .draftSteer, .stageFork, .stageInterrupt, .stageReview, .confirmAction:
+        case .draftQueueMessage, .stageSideQuestion, .draftSteer, .stageFork, .stageInterrupt, .stageReview, .confirmAction:
             return true
         }
     }
@@ -29,6 +30,8 @@ public struct VoiceToolPolicy: Sendable {
         switch tool {
         case .draftQueueMessage:
             return .queueMessage
+        case .stageSideQuestion:
+            return .sideQuestion
         case .draftSteer:
             return .steerTurn
         case .stageFork:

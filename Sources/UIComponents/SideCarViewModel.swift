@@ -177,11 +177,39 @@ public final class SideCarViewModel: ObservableObject {
         }
     }
 
+    public func stageSideQuestion() {
+        let trimmed = chatDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let action = SideCarAction(
+            kind: .sideQuestion,
+            targetThreadId: activeThread.id,
+            targetTurnId: nil,
+            payloadPreview: trimmed,
+            actor: .userClick,
+            source: activeThread.freshness.source,
+            confirmationState: .staged
+        )
+        do {
+            try actionGate.validateForStaging(action, activeThread: activeThread)
+            stagedAction = action
+            chatDraft = ""
+        } catch {
+            stagedAction = SideCarAction(
+                kind: .sideQuestion,
+                targetThreadId: activeThread.id,
+                payloadPreview: "Could not stage side question: \(error)",
+                actor: .system,
+                source: activeThread.freshness.source,
+                confirmationState: .failed
+            )
+        }
+    }
+
     public func stage(_ kind: SideCarActionKind) {
         let action = SideCarAction(
             kind: kind,
             targetThreadId: activeThread.id,
-            targetTurnId: activeThread.currentTurn?.id,
+            targetTurnId: kind == .sideQuestion ? nil : activeThread.currentTurn?.id,
             payloadPreview: defaultPayload(for: kind),
             actor: .userClick,
             source: activeThread.freshness.source,
@@ -194,7 +222,7 @@ public final class SideCarViewModel: ObservableObject {
             stagedAction = SideCarAction(
                 kind: kind,
                 targetThreadId: activeThread.id,
-                targetTurnId: activeThread.currentTurn?.id,
+                targetTurnId: kind == .sideQuestion ? nil : activeThread.currentTurn?.id,
                 payloadPreview: "Could not stage action: \(error)",
                 actor: .system,
                 source: activeThread.freshness.source,
@@ -257,6 +285,11 @@ public final class SideCarViewModel: ObservableObject {
         realtimeReadiness = Self.readiness(from: await realtimeStatusClient.checkRealtimeStatus(model: RealtimeTokenBroker.defaultRealtimeModel))
     }
 
+    public func startRealtimeVoiceSession() async {
+        selectedBottomTab = .talk
+        await checkRealtimeReadiness()
+    }
+
     public func capturePreview(displayName: String = "Main display") throws {
         previewBundle = try screenPreviewCoordinator.capturePreviewBundle(displayName: displayName)
     }
@@ -312,6 +345,8 @@ public final class SideCarViewModel: ObservableObject {
         switch kind {
         case .queueMessage:
             return "Queue a follow-up message for this thread."
+        case .sideQuestion:
+            return "Ask a /side tangent without steering the parent thread."
         case .steerTurn:
             return "Steer the active turn with a concise instruction."
         case .forkThread:

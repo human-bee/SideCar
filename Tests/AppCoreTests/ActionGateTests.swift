@@ -19,6 +19,24 @@ import Testing
     }
 }
 
+@Test func sideQuestionIsSafeButStillRequiresConfirmation() throws {
+    let thread = SampleData.activeThread
+    let gate = ActionGate()
+    let action = SideCarAction(
+        kind: .sideQuestion,
+        targetThreadId: thread.id,
+        payloadPreview: "What did the last tool call prove?",
+        actor: .userClick,
+        source: .fixture,
+        confirmationState: .staged
+    )
+
+    try gate.validateForStaging(action, activeThread: thread)
+    #expect(throws: ActionGateError.confirmationRequired) {
+        try gate.validateForExecution(action, activeThread: thread)
+    }
+}
+
 @Test func steerRequiresTurnId() throws {
     let thread = SampleData.activeThread
     let gate = ActionGate()

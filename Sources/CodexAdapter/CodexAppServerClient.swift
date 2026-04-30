@@ -186,6 +186,8 @@ public struct CodexLiveActionRequest: Equatable, Sendable {
         switch action.kind {
         case .queueMessage:
             return startTurn(threadId: action.targetThreadId, message: action.payloadPreview)
+        case .sideQuestion:
+            return sideQuestion(threadId: action.targetThreadId, question: action.payloadPreview)
         case .steerTurn:
             guard let turnId = action.targetTurnId else {
                 throw CodexAppServerError.unsupportedLiveAction(action.kind)
@@ -247,6 +249,28 @@ public struct CodexLiveActionRequest: Equatable, Sendable {
             params["developerInstructions"] = .string(message)
         }
         return CodexLiveActionRequest(method: "thread/fork", params: .object(params))
+    }
+
+    public static func sideQuestion(threadId: String, question: String) -> CodexLiveActionRequest {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        let instructions = """
+        Side conversation requested through the SideCar /side primitive.
+        Treat the parent thread history as read-only reference context.
+        Answer the tangent without steering the parent turn.
+        Do not mutate files, run commands, install plugins, or create worktrees unless the user explicitly asks inside this side conversation.
+
+        User side question:
+        \(trimmed)
+        """
+
+        return CodexLiveActionRequest(
+            method: "thread/fork",
+            params: .object([
+                "threadId": .string(threadId),
+                "persistExtendedHistory": .bool(false),
+                "developerInstructions": .string(instructions)
+            ])
+        )
     }
 
     public static func compactThread(threadId: String, instructions: String? = nil) -> CodexLiveActionRequest {

@@ -29,6 +29,7 @@ public enum ActionGateError: Error, Equatable, CustomStringConvertible {
 public struct ActionGate: Sendable {
     public static let mvpSafeActions: Set<SideCarActionKind> = [
         .queueMessage,
+        .sideQuestion,
         .steerTurn,
         .forkThread,
         .interruptTurn,

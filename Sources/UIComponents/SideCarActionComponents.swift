@@ -21,6 +21,12 @@ struct VoiceAndQueueCard: View {
                 .textFieldStyle(.roundedBorder)
 
             HStack(spacing: 8) {
+                Button("/side") {
+                    viewModel.stageSideQuestion()
+                }
+                .buttonStyle(.bordered)
+                .help("Ask a tangent question in a guarded side conversation.")
+
                 Button("Queue") {
                     viewModel.stageMessage(asSteer: false)
                 }
@@ -174,6 +180,7 @@ private struct ActionStripView: View {
 
     var body: some View {
         HStack(spacing: 8) {
+            actionButton("/side", "sidebar.right", .sideQuestion)
             actionButton("Steer", "arrow.triangle.turn.up.right.circle", .steerTurn)
             actionButton("Fork", "arrow.triangle.branch", .forkThread)
             actionButton("Interrupt", "stop.circle", .interruptTurn)

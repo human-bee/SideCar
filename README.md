@@ -9,12 +9,12 @@ This repository is a two-hour MVP scaffold, not a finished Codex automation prod
 - Native AppKit + SwiftUI floating panel.
 - SwiftPM modules for app contracts, Codex integration, fixture-backed thread storage, Realtime voice token brokering, and UI.
 - Fixture/demo mode that runs without private Codex state.
-- Safe action-gating contracts for queued messages, steer, fork, interrupt, review, compact, and approvals.
+- Safe action-gating contracts for queued messages, `/side` tangents, steer, fork, interrupt, review, compact, and approvals.
 - Live Codex app-server snapshot loading through initialize, `thread/list`, and `thread/read`.
 - App-server notification stream reader/reducer contracts for thread, turn, item, command-output, and approval-request events.
 - Confirmed safe actions can be sent to the live Codex app-server for the MVP-supported methods.
 - Approval cards are visible and scoped; app-server approval request ids and response payloads are modeled, but live approval fulfillment remains disabled until the same-connection response path is wired.
-- Realtime readiness and screen-preview controls are available in Talk mode without sending visual context to a model.
+- Realtime readiness, Option-Shift-Space voice hotkey entry, and screen-preview controls are available in Talk mode without sending visual context to a model.
 - Documentation for architecture, privacy, compatibility, and design direction.
 
 Current limitations are intentional: wiring the independent stream reader into app state, live approval response execution, signed/notarized distribution, full voice audio loop wiring, and production-grade ScreenCaptureKit UX are roadmap items.
@@ -25,7 +25,7 @@ Current limitations are intentional: wiring the independent stream reader into a
 2. Promote fixture snapshots into sanitized regression fixtures.
 3. Add signed/notarized macOS packaging.
 4. Expand visual context consent UX before enabling richer screen-aware features.
-5. Harden global hotkeys beyond the current active-app scaffold.
+5. Harden global hotkeys beyond the current AppKit monitor scaffold.
 
 ## Requirements
 
@@ -51,6 +51,13 @@ swift run SideCar
 ```
 
 The app opens as a menu bar accessory with a floating SideCar panel. It tries live Codex app-server loading first and falls back to fixture mode if Codex is unavailable.
+
+Hotkeys:
+
+- Option-Space toggles the SideCar panel.
+- Option-Shift-Space opens Talk mode and checks Realtime readiness.
+
+The `/side` button stages a guarded side conversation from the current thread context. Until Codex exposes a dedicated app-server `/side` method, SideCar sends this as a non-persistent `thread/fork` with instructions that treat the parent history as read-only reference context.
 
 Build and open a local debug `.app` bundle:
 

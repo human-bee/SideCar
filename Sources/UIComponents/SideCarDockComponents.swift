@@ -151,6 +151,12 @@ private struct TalkDock: View {
             TextField("Ask SideCar. Queues follow-up unless you explicitly steer.", text: $viewModel.chatDraft)
                 .textFieldStyle(.roundedBorder)
             HStack {
+                Button("/side") {
+                    viewModel.stageSideQuestion()
+                }
+                .buttonStyle(.borderedProminent)
+                .help("Open a guarded side conversation from the current thread context.")
+
                 Toggle("speech-to-speech", isOn: $viewModel.speechToSpeechEnabled)
                     .font(.system(size: 12))
                 Spacer()
@@ -172,7 +178,7 @@ private struct TalkDock: View {
                 .font(.system(size: 11))
                 .foregroundStyle(realtimeStatusColor)
                 .lineLimit(1)
-            Text("Preview controls stage screen context only. Live speech-to-speech streaming is not implemented in this slice.")
+            Text("Option-Shift-Space opens Talk and checks Realtime readiness. Preview controls stage screen context only.")
                 .font(.system(size: 11))
                 .foregroundStyle(CodexTheme.secondaryText)
                 .lineLimit(2)
@@ -305,7 +311,7 @@ private struct SettingsDock: View {
                 Text("Global Hotkey")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CodexTheme.primaryText)
-                Label("Scaffolded: Option-Space toggles SideCar while the app is active.", systemImage: "keyboard")
+                Label("Option-Space toggles SideCar. Option-Shift-Space opens Talk and checks Realtime readiness.", systemImage: "keyboard")
                     .font(.system(size: 11))
                     .foregroundStyle(CodexTheme.secondaryText)
                     .lineLimit(2)
