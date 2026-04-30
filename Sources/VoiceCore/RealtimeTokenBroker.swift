@@ -11,6 +11,40 @@ public struct RealtimeSessionToken: Codable, Equatable, Sendable {
         self.rawResponse = rawResponse
         self.createdAt = createdAt
     }
+
+    public func redactedSummary() throws -> RealtimeSessionSummary {
+        try RealtimeSessionSummary(token: self)
+    }
+}
+
+public struct RealtimeSessionSummary: Equatable, Sendable {
+    public var model: String
+    public var hasClientSecret: Bool
+    public var expiresAt: Date?
+
+    public var diagnosticText: String {
+        let secretState = hasClientSecret ? "present" : "missing"
+        let expiryText = expiresAt.map { " expires_at: \(Int($0.timeIntervalSince1970))" } ?? ""
+        return "Realtime \(model) client_secret: \(secretState)\(expiryText)"
+    }
+
+    public init(model: String, hasClientSecret: Bool, expiresAt: Date? = nil) {
+        self.model = model
+        self.hasClientSecret = hasClientSecret
+        self.expiresAt = expiresAt
+    }
+
+    public init(token: RealtimeSessionToken) throws {
+        let data = Data(token.rawResponse.utf8)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let responseModel = object?["model"] as? String
+        let clientSecret = object?["client_secret"] as? [String: Any]
+        let expiresAt = clientSecret?["expires_at"] as? TimeInterval
+
+        self.model = responseModel ?? token.model
+        self.hasClientSecret = clientSecret?["value"] as? String != nil
+        self.expiresAt = expiresAt.map(Date.init(timeIntervalSince1970:))
+    }
 }
 
 public enum RealtimeSessionStatus: Equatable, Sendable {

@@ -62,6 +62,35 @@ import VoiceCore
     #expect(token.rawResponse == #"{"client_secret":"redacted"}"#)
 }
 
+@Test func realtimeSessionSummaryRedactsEphemeralSecret() throws {
+    let token = RealtimeSessionToken(
+        model: "gpt-realtime-1.5",
+        rawResponse: #"{"model":"gpt-realtime-1.5","client_secret":{"value":"eph_secret_should_not_render","expires_at":1770000000}}"#
+    )
+
+    let summary = try token.redactedSummary()
+
+    #expect(summary.model == "gpt-realtime-1.5")
+    #expect(summary.hasClientSecret == true)
+    #expect(summary.expiresAt == Date(timeIntervalSince1970: 1_770_000_000))
+    #expect(summary.diagnosticText.contains("gpt-realtime-1.5"))
+    #expect(summary.diagnosticText.contains("client_secret: present"))
+    #expect(summary.diagnosticText.contains("eph_secret_should_not_render") == false)
+}
+
+@Test func realtimeSessionSummaryFallsBackToRequestedModelWhenResponseOmitsModel() throws {
+    let token = RealtimeSessionToken(
+        model: "gpt-realtime-1.5",
+        rawResponse: #"{"client_secret":{"value":"eph_secret_should_not_render"}}"#
+    )
+
+    let summary = try token.redactedSummary()
+
+    #expect(summary.model == "gpt-realtime-1.5")
+    #expect(summary.hasClientSecret == true)
+    #expect(summary.expiresAt == nil)
+}
+
 @Test func realtimeBrokerMapsMintFailureToStatus() async throws {
     let broker = RealtimeTokenBroker(
         apiKeySource: StaticOpenAIAPIKeySource("test-key"),
