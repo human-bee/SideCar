@@ -29,6 +29,20 @@ import VoiceCore
     #expect(accepted.sentToModel == false)
 }
 
+@Test func screenContextCaptureCreatesUnsentPreviewBundle() throws {
+    let previewURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension("png")
+    let coordinator = ScreenContextCoordinator(capturer: StubScreenCapturer(previewURL: previewURL))
+
+    let bundle = try coordinator.capturePreviewBundle(displayName: "Desktop check")
+
+    #expect(bundle.displayName == "Desktop check")
+    #expect(bundle.imagePath == previewURL.path)
+    #expect(bundle.previewAccepted == false)
+    #expect(bundle.sentToModel == false)
+}
+
 @Test func realtimeBrokerReportsMissingKeyWithoutNetwork() async throws {
     let broker = RealtimeTokenBroker(
         apiKeySource: StaticOpenAIAPIKeySource(nil),
@@ -138,5 +152,13 @@ private struct StubRealtimeTransport: RealtimeSessionTransport {
         #expect(apiKey.isEmpty == false)
         #expect(model.isEmpty == false)
         return response
+    }
+}
+
+private struct StubScreenCapturer: ScreenImageCapturing {
+    var previewURL: URL
+
+    func captureMainDisplayPreview() throws -> URL {
+        previewURL
     }
 }
