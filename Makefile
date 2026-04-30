@@ -1,4 +1,4 @@
-.PHONY: test build run app realtime-smoke
+.PHONY: test build run app audit-share realtime-smoke
 
 test:
 	swift test
@@ -11,6 +11,9 @@ run:
 
 app:
 	scripts/build-debug-app.sh
+
+audit-share:
+	scripts/audit-share-ready.sh
 
 realtime-smoke:
 	scripts/realtime-smoke.sh
