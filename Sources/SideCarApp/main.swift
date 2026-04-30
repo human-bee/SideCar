@@ -126,8 +126,10 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.title = "SideCar"
         panel.isFloatingPanel = true
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
         panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.titlebarAppearsTransparent = true
         panel.contentView = NSHostingView(rootView: SideCarRootView(viewModel: viewModel))
         panel.minSize = NSSize(width: 430, height: 640)
@@ -143,7 +145,10 @@ final class SideCarAppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.title = "SideCar Settings"
         panel.isFloatingPanel = true
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
         panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.titlebarAppearsTransparent = true
         panel.contentView = NSHostingView(rootView: SideCarSettingsView(viewModel: viewModel))
         return panel
