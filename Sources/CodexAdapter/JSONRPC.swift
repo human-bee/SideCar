@@ -26,6 +26,18 @@ public struct JSONRPCResponse: Codable, Equatable, Sendable {
     public var error: JSONRPCError?
 }
 
+public struct JSONRPCNotification: Codable, Equatable, Sendable {
+    public var jsonrpc: String?
+    public var method: String
+    public var params: JSONValue?
+
+    public init(jsonrpc: String? = "2.0", method: String, params: JSONValue? = nil) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
 public enum JSONRPCCodec {
     public static func encodeLine(_ request: JSONRPCRequest) throws -> Data {
         let data = try JSONEncoder().encode(request)
@@ -34,5 +46,9 @@ public enum JSONRPCCodec {
 
     public static func decodeResponse(_ data: Data) throws -> JSONRPCResponse {
         try JSONDecoder().decode(JSONRPCResponse.self, from: data)
+    }
+
+    public static func decodeNotification(_ data: Data) throws -> JSONRPCNotification {
+        try JSONDecoder().decode(JSONRPCNotification.self, from: data)
     }
 }
